@@ -27,7 +27,7 @@ class BoardEdgesTest {
         assertEquals(338.0, Board.RIGHT, 0.0)
         assertEquals(24.0, minX, 0.0)
         assertEquals(334.0, maxX, 0.0)
-        assertEquals(8.0, Board.TOP, 0.0)
+        assertEquals(20.0, Board.TOP, 0.0)
         assertEquals(482.0, Board.FLOOR, 0.0)
         assertEquals(476.0, Board.LAUNCH_Y, 0.0)
         for (row in 0..9) {
@@ -46,7 +46,7 @@ class BoardEdgesTest {
                 }
             }
         }
-        assertEquals(12.0, Block(1, 0, 0, 1).y - Board.TOP, 0.0)
+        assertEquals(0.0, Block(1, 0, 0, 1).y - Board.TOP, 0.0)
     }
 
     @Test fun aimUsesTightSideLimitsAndSeesTheUndersideOfBothEdgeBlocks() {

@@ -194,7 +194,7 @@ class ReboundControlsTest : ReboundUiTest() {
         assertTrue(before[old.x.toInt(), old.y.toInt()].red < .3f)
         assertTrue(after[old.x.toInt(), old.y.toInt()].red > .7f)
         assertTrue(after[next.x.toInt(), next.y.toInt()].red < .3f)
-        val ceiling = boardPoint(180.0, 8.0)
+        val ceiling = boardPoint(180.0, com.nicgames.rebound.game.Board.TOP)
         assertTrue("Ceiling must be visibly darker than the empty field", after[ceiling.x.toInt(), ceiling.y.toInt()].red < .7f)
         captureScreen("landing")
     }

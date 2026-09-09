@@ -12,7 +12,7 @@ import kotlinx.serialization.encoding.Encoder
  */
 @Serializable(with = GameSnapshotSerializer::class)
 data class GameSnapshot(
-    val version: Int = 2,
+    val version: Int = 3,
     val phase: Phase,
     val round: Int,
     val ballCount: Int,
@@ -37,7 +37,7 @@ data class GameSnapshot(
 
 /**
  * Old JSON used encodeDefaults=false, so a missing version means version 1, NOT
- * the current constructor default. The wire default stays at 1; new version-2
+ * the current constructor default. The wire default stays at 1; new version-3
  * snapshots consequently always write their version even with default JSON settings.
  */
 internal object GameSnapshotSerializer : KSerializer<GameSnapshot> {

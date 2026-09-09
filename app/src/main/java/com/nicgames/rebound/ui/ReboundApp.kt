@@ -50,7 +50,7 @@ import kotlin.math.min
 import java.util.Locale
 
 @Composable
-fun ReboundApp(model: AppModel, onHit: () -> Unit = {}, onTestSound: () -> Unit = {}) {
+fun ReboundApp(model: AppModel, onHit: (Int) -> Unit = {}, onTestSound: () -> Unit = {}) {
     MaterialTheme(colorScheme = lightColorScheme(primary = Ink, onPrimary = Color.White, surface = Field, onSurface = Ink, background = Field)) {
         val screen = model.screen
         BackHandler(screen != Screen.HOME) { model.back() }
@@ -156,7 +156,7 @@ private fun HomeScreen(model: AppModel) {
 }
 
 @Composable
-private fun PlayScreen(model: AppModel, onHit: () -> Unit) {
+private fun PlayScreen(model: AppModel, onHit: (Int) -> Unit) {
     val game = model.engine ?: return
     val revision = model.revision
     val phase = game.phase
@@ -170,7 +170,8 @@ private fun PlayScreen(model: AppModel, onHit: () -> Unit) {
                     val hits = game.totalHits
                     if (previous != 0L) model.tick((now - previous) / 1_000_000_000.0)
                     previous = now
-                    if (game.totalHits > hits) onHit()
+                    val newHits = game.totalHits - hits
+                    if (newHits > 0) onHit(newHits.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
                 }
             }
         }

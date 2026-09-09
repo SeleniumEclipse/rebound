@@ -8,14 +8,17 @@
 - **Gradle wrapper** — Gradle, Inc. and contributors, Apache License 2.0.
 - **JUnit 4** (tests only) — Eclipse Public License 1.0.
 
-## Recorded pop sound
+## UI pop sound — required attribution
 
-**“Bubble Pop” by Mafon2**, published on Freesound on 6 November 2014. Author description: “Gum bubble popped.” Licensed **Creative Commons Zero (CC0 1.0 Universal)**, allowing redistribution and commercial use. Credit is included voluntarily in the app.
+**“UI_POP_UP.mp3” by Marevnik**, Freesound, 3 November 2023, licensed **Creative Commons Attribution 4.0 International**.
 
-- [Sound page and license](https://freesound.org/people/Mafon2/sounds/253956/)
-- [CC0 public-domain dedication](https://creativecommons.org/publicdomain/zero/1.0/)
-- [Public high-quality MP3 preview used](https://cdn.freesound.org/previews/253/253956_1196472-hq.mp3)
-- Included file: [app/src/main/res/raw/block_pop.mp3](app/src/main/res/raw/block_pop.mp3), 8,328 bytes; SHA-256 `09a72dba775c2407cd2227fb5fceb385d5dd18979fc1715f4d07c63d5f444a83`.
-- Unmodified recording preview, no resynthesis or pitch manipulation. Re-download and verify with [tools/fetch-pop-sound.cjs](tools/fetch-pop-sound.cjs).
+- [Creator and sound page](https://freesound.org/people/Marevnik/sounds/708605/)
+- [License terms](https://creativecommons.org/licenses/by/4.0/) and [legal code](https://creativecommons.org/licenses/by/4.0/legalcode)
+- [Public high-quality preview used](https://cdn.freesound.org/previews/708/708605_13515726-hq.mp3)
+- Source SHA-256: `76e68aee31611cc35ee5c12c7e1f90766d1c149765ad3acc444747e20f4d1677`.
+- Adapted asset: [app/src/main/res/raw/ui_pop.wav](app/src/main/res/raw/ui_pop.wav), 6,268 bytes, SHA-256 `d2e5adfec812a575e242ba69507a11e1e6f336ec940bbe971a4bfe39b9082919`.
+- **Changes:** decoded to mono PCM, leading/trailing silence trimmed, amplitude reduced slightly, 1ms edge fades. Pitch and tone retained. Playback mixing includes gain/headroom protection. No endorsement by the creator is implied.
+- Preparation and timing analysis: [tools/prepare-ui-pop.cjs](tools/prepare-ui-pop.cjs). This utility also downloads the previous CC0 recording only for comparison; that recording is no longer bundled.
+- The same attribution and license link are accessible in Settings → About & licenses and [app/src/main/res/raw/audio_credit.txt](app/src/main/res/raw/audio_credit.txt).
 
-Original game graphics are drawn in code. No Ballz, Holedown, Mini Metro, or other game's artwork, sound files, or source code is included. The former synthesized hit and its generator have been removed.
+Original game graphics are drawn in code. No other game's proprietary sound has been extracted. The hard gum-bubble recording and former synthesized hit are removed from the app.

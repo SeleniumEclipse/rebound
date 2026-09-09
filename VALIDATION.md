@@ -1,5 +1,39 @@
 # Rebound validation
 
+## Version 1.3.0 — 9 September 2026
+
+**142 JVM tests passed** and **36 Android tests passed**, zero failures. This includes the earlier engine/control suite, 14 ceiling/migration regression methods, ten PCM mixer tests, and real Android audio-write/playback checks. Release lint and editor diagnostics report **zero errors**.
+
+### Softer sound and stronger evidence
+
+Selected the existing **UI_POP_UP.mp3 by Marevnik** (CC BY 4.0), not another physical pop recording or generated substitute. The inspected source page showed approximately 9,600 downloads, 247 ratings, and positive comments including “Exactly what I needed! Thanks.” These are observations of the source page, not a universal quality claim. Attribution, source, license link, and modifications are documented in the app and third-party notices.
+
+Measured decoded source audio:
+- Previous gum-bubble recording: 223.85ms total; first sample above 0.02 amplitude at 55.71ms; peak 1.021 (MP3 reconstruction overshoot).
+- New prepared UI sound: 70.57ms total; first sample above 0.02 at 8.30ms; peak 0.65. It is mono PCM with silence trimmed, slight attenuation, and 1ms edge fades. Tone and pitch retained.
+
+One confirmed logical loss in the old pipeline was a boolean per-frame trigger: multiple block hits in the same frame became one playback request. The new callback passes the hit count to the mixer. PCM voices overlap without restarting earlier samples; small simultaneous groups have 2ms-spaced starts. Extreme groups are weighted into bounded onsets with a soft limiter, not promised as hundreds of separately distinguishable pops. A persistent nonblocking AudioTrack replaces SoundPool, with partial-write handling, interruptible backpressure, lifecycle flush generations, and bounded invalidated-output recovery. A trailing silent buffer ensures a single short sound fills a device's start threshold.
+
+Tests now verify **nonzero PCM actually written and Android's playback head advancing**, not just accepted stream IDs. Eight separately played pops, each followed by complete output drain, produced:
+- 56,992 written frames;
+- 56,992 played frames;
+- 15,312 nonzero frames above the diagnostic threshold;
+- zero write failures.
+
+Also tested same-frame hits, rapid successive hits, fresh audio after an acknowledged stop/flush, Sound off, and no changes to system media volume. These checks establish output through Android's audio path; **they do not establish audibility or subjective tone through the user's particular phone speaker/Bluetooth route**. The emulator's host sound was disabled. The source timing and coalesced-hit behavior are measured facts; a specific handset's entire intermittent-sound cause has not been proven.
+
+### Closed top gap and saved-game safety
+
+Ceiling is now y=20, exactly the first row's top; minimum ball-center y=24. Existing side walls remain x=20/338. No upper corridor remains; interior tile spacing is unchanged. Collision tests cover under-block hits, exposed corners and ceiling/wall combinations. Rendered-pixel tests confirm the ceiling moved to the row edge and the old upper line is absent.
+
+Snapshots v1/v2 migrate to v3 after validation against their original bounds. A clear-space ball moves inward and reflects only an outward velocity; a ball that would overlap a block is returned without damage or new pickup awards. Other balls/queues continue; already-earned pickups commit once if the volley finishes. Tests cover implicit old version fields, combined side/top migration, round trips, corrupt-save rejection, and actual app relaunch from an old upper-lane save.
+
+### Signed release
+
+Installed over the prior signed release. All **seven black-box smoke checks passed**, including the real speed slider, pull-back shot/round advancement, pause, process termination, and restored run/preference. The closed-ceiling Android screenshot was visually inspected.
+
+APK **1,024,448 bytes**, SHA-256 **d7fedd47439d99f761cd76e3b5e358be344e393ac4aa324e3d951199cc56b237**. Package unchanged, versionCode 4, versionName 1.3.0.
+
 ## Version 1.2.0 — 9 September 2026
 
 **118 JVM tests passed**, zero failures: the previous 98 plus five board-edge test methods (many left/right/angle/corner combinations) and 15 legacy-save migration tests. The edge tests confirm walls exactly at the seven-column grid boundaries, circle-aware aiming, one underside hit rather than a side-lane hit storm, finite motion, conserved velocity, and correct corner/wall behavior.

@@ -12,7 +12,7 @@ object Board {
     const val BLOCK_SIZE = 42.0
     const val LEFT = BLOCK_LEFT
     const val RIGHT = BLOCK_LEFT + (COLUMNS - 1) * COLUMN_STEP + BLOCK_SIZE
-    const val TOP = 8.0
+    const val TOP = BLOCK_TOP
     const val FLOOR = 482.0
     const val LAUNCH_Y = 476.0
     const val BALL_RADIUS = 4.0

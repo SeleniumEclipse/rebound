@@ -432,6 +432,8 @@ class GameEngine private constructor(seed: Long, initialize: Boolean) {
         // Frozen version-1 ball-center limits; do not derive these from the new walls.
         private const val LEGACY_MIN_X = 16.0
         private const val LEGACY_MAX_X = 344.0
+        // Versions 1 and 2 shared the old ceiling, including its ball-radius clearance.
+        private const val LEGACY_MIN_Y = 12.0
         private const val MIN_Y = Board.TOP + Board.BALL_RADIUS
         private const val LANDING_Y = Board.FLOOR - Board.BALL_RADIUS
 
@@ -445,12 +447,12 @@ class GameEngine private constructor(seed: Long, initialize: Boolean) {
         /** Rejects corrupt, nonfinite, overlapping, oversized, or inconsistent state. */
         fun restore(snapshot: GameSnapshot): GameEngine? {
             val state = when (snapshot.version) {
-                1 -> {
+                1, 2 -> {
                     // Validate the ORIGINAL save first. Clamping must never repair corruption.
-                    if (!validSnapshot(snapshot, LEGACY_MIN_X, LEGACY_MAX_X)) return null
+                    if (!validSnapshot(snapshot)) return null
                     migrateLegacySnapshot(snapshot)
                 }
-                2 -> snapshot
+                3 -> snapshot
                 else -> return null
             }
             // Migration must produce a fully valid new save before constructing an engine.
@@ -483,23 +485,28 @@ class GameEngine private constructor(seed: Long, initialize: Boolean) {
             var returnedX: Double? = null
             for (savedBall in s.balls) {
                 val ball = savedBall.copy()
-                if (ball.x !in MIN_X..MAX_X) {
+                val movedX = ball.x !in MIN_X..MAX_X
+                val movedY = ball.y < MIN_Y
+                if (movedX || movedY) {
                     ball.x = ball.x.coerceIn(MIN_X, MAX_X)
+                    ball.y = ball.y.coerceAtLeast(MIN_Y)
                     if (s.blocks.any { Collision.overlapsBox(ball, it) }) {
-                        // The removed side lane can border a solid block. Return this ball
-                        // directly to the floor, without sweeping, damage, or pickup awards.
+                        // Removed side/ceiling lanes can border solid blocks. Clamp both
+                        // axes before checking corners; return trapped balls directly to
+                        // the floor, without sweeping, damage, or pickup awards.
                         // Simultaneous forced returns use the same leftmost tie-break as landings.
                         returnedX = min(returnedX ?: ball.x, ball.x)
                         continue
                     }
-                    if ((ball.x == MIN_X && ball.vx < 0.0) || (ball.x == MAX_X && ball.vx > 0.0)) {
+                    if (movedX && ((ball.x == MIN_X && ball.vx < 0.0) || (ball.x == MAX_X && ball.vx > 0.0))) {
                         ball.vx = -ball.vx
                     }
+                    if (movedY && ball.vy < 0.0) ball.vy = -ball.vy
                 }
                 balls.add(ball)
             }
             val migrated = s.copy(
-                version = 2, balls = balls, launchX = s.launchX.coerceIn(MIN_X, MAX_X),
+                version = 3, balls = balls, launchX = s.launchX.coerceIn(MIN_X, MAX_X),
                 firstReturnX = s.firstReturnX?.coerceIn(MIN_X, MAX_X) ?: returnedX,
             )
             if (migrated.phase != Phase.FIRING || balls.isNotEmpty() || migrated.pendingLaunches > 0) {
@@ -514,8 +521,11 @@ class GameEngine private constructor(seed: Long, initialize: Boolean) {
             )
         }
 
-        private fun validSnapshot(s: GameSnapshot, minX: Double = MIN_X, maxX: Double = MAX_X): Boolean {
-            if (s.version !in 1..2 || s.round < 1 || s.ballCount !in 1..MAX_BALLS) return false
+        private fun validSnapshot(s: GameSnapshot): Boolean {
+            if (s.version !in 1..3 || s.round < 1 || s.ballCount !in 1..MAX_BALLS) return false
+            val minX = if (s.version == 1) LEGACY_MIN_X else MIN_X
+            val maxX = if (s.version == 1) LEGACY_MAX_X else MAX_X
+            val minY = if (s.version <= 2) LEGACY_MIN_Y else MIN_Y
             if (!s.launchX.isFinite() || s.launchX !in minX..maxX) return false
             if (!validAngle(s.shotAngle)) return false
             if (!s.accumulator.isFinite() || s.accumulator < 0.0 || s.accumulator >= FIXED_STEP) return false
@@ -560,7 +570,7 @@ class GameEngine private constructor(seed: Long, initialize: Boolean) {
             if (s.phase == Phase.GAME_OVER && s.blocks.none { it.row == 9 }) return false
             for (ball in s.balls) {
                 if (!ball.x.isFinite() || !ball.y.isFinite() || !ball.vx.isFinite() || !ball.vy.isFinite()) return false
-                if (ball.x !in minX..maxX || ball.y !in MIN_Y..LANDING_Y) return false
+                if (ball.x !in minX..maxX || ball.y !in minY..LANDING_Y) return false
                 val speed = hypot(ball.vx, ball.vy)
                 if (speed < 1e-6 || speed > 10_000.0) return false
                 if (s.blocks.any { Collision.overlapsBox(ball, it) }) return false

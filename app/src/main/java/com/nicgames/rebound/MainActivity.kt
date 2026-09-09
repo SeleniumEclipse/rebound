@@ -15,6 +15,10 @@ class MainActivity : ComponentActivity() {
     private var audio: GameAudio? = null
     internal val audioReady: Boolean get() = audio?.ready == true
     internal val soundPlaybackCount: Int get() = audio?.playbackCount ?: 0
+    internal val soundWrittenFrames: Long get() = audio?.writtenFrames ?: 0
+    internal val soundAudibleFrames: Long get() = audio?.audibleFrames ?: 0
+    internal val soundPlayedFrames: Long get() = audio?.playedFrames ?: 0
+    internal val soundWriteFailures: Int get() = audio?.writeFailures ?: 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,12 +31,16 @@ class MainActivity : ComponentActivity() {
         setContent { ReboundApp(model, onHit = ::hit, onTestSound = ::testSound) }
     }
 
-    private fun hit() {
-        if (model.sound) audio?.hit()
+    private fun hit(count: Int) {
+        if (model.sound) audio?.hit(count = count)
     }
 
     private fun testSound() {
         if (!model.sound) return
+        if (audio?.ready != true) {
+            audio?.release()
+            audio = runCatching { GameAudio(this) }.getOrNull()
+        }
         val manager = getSystemService(AudioManager::class.java)
         if (manager.getStreamVolume(AudioManager.STREAM_MUSIC) == 0) {
             Toast.makeText(this, "Media volume is muted. Use the volume buttons.", Toast.LENGTH_SHORT).show()

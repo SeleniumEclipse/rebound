@@ -50,7 +50,7 @@ import kotlin.math.min
 @Retention(AnnotationRetention.RUNTIME)
 annotation class LaunchWith(val value: ReboundFixture, val helpSeen: Boolean = true)
 
-enum class ReboundFixture { EMPTY, ROUND_42, MID_FLIGHT, BEFORE_LOSS, FIRST_LANDING, NEXT_HIT, RAPID_HITS, LEGACY_EDGE }
+enum class ReboundFixture { EMPTY, ROUND_42, MID_FLIGHT, BEFORE_LOSS, FIRST_LANDING, NEXT_HIT, RAPID_HITS, LEGACY_EDGE, SAME_FRAME_HITS, LEGACY_CEILING }
 
 internal object ReboundFixtures {
     fun round42(): GameSnapshot = checked(GameEngine(4242L).snapshot().copy(
@@ -106,10 +106,21 @@ internal object ReboundFixtures {
                 balls = listOf(Ball(41.0, 69.0, 0.0, -430.0), Ball(41.0, 80.0, 0.0, -430.0), Ball(41.0, 91.0, 0.0, -430.0)),
                 shotAngle = -Math.PI / 2,
             ))
+            ReboundFixture.SAME_FRAME_HITS -> checked(round42().copy(
+                phase = Phase.FIRING, ballCount = 3, blocks = listOf(Block(1, 0, 0, 9)), pickups = emptyList(),
+                balls = listOf(Ball(32.0, 69.0, 0.0, -430.0), Ball(41.0, 69.0, 0.0, -430.0), Ball(50.0, 69.0, 0.0, -430.0)),
+                shotAngle = -Math.PI / 2,
+            ))
             ReboundFixture.LEGACY_EDGE -> checked(round42().copy(
                 version = 1, phase = Phase.FIRING, ballCount = 3, launchX = 16.0,
                 blocks = listOf(Block(1, 0, 6, 9)), pickups = emptyList(),
                 balls = listOf(Ball(16.0, 320.0, 0.0, -430.0), Ball(180.0, 200.0, 0.0, -430.0)),
+                pendingLaunches = 1, launchCountdown = .04, shotAngle = -Math.PI / 2,
+            ))
+            ReboundFixture.LEGACY_CEILING -> checked(round42().copy(
+                version = 2, phase = Phase.FIRING, ballCount = 3, launchX = 180.0,
+                blocks = listOf(Block(1, 0, 0, 9)), pickups = emptyList(),
+                balls = listOf(Ball(41.0, 12.0, 0.0, 430.0), Ball(180.0, 200.0, 0.0, -430.0)),
                 pendingLaunches = 1, launchCountdown = .04, shotAngle = -Math.PI / 2,
             ))
         }

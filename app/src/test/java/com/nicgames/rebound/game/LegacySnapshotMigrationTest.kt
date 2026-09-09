@@ -33,15 +33,15 @@ class LegacySnapshotMigrationTest {
         balls = s.balls.map { it.copy() }, impacts = s.impacts.map { it.copy() },
     )
 
-    @Test fun newSnapshotsDefaultToVersionTwoAndAlwaysWriteItToJson() {
+    @Test fun newSnapshotsDefaultToVersionThreeAndAlwaysWriteItToJson() {
         val engine = fixture(ballCount = 10)
         engine.fire(-1.25)
         engine.tick(0.123)
         val saved = engine.snapshot()
-        assertEquals(2, saved.version)
+        assertEquals(3, saved.version)
         for (json in listOf(Json, Json { encodeDefaults = true }, Json { ignoreUnknownKeys = true })) {
             val text = json.encodeToString(saved)
-            assertEquals(JsonPrimitive(2), json.parseToJsonElement(text).jsonObject["version"])
+            assertEquals(JsonPrimitive(3), json.parseToJsonElement(text).jsonObject["version"])
             val decoded = json.decodeFromString<GameSnapshot>(text)
             assertEquals(saved, decoded)
             assertEquals(saved, restored(decoded).snapshot())
@@ -62,7 +62,7 @@ class LegacySnapshotMigrationTest {
                 assertEquals(legacy, decoded)
                 assertEquals(1, decoded.version)
                 val migrated = restored(decoded).snapshot()
-                assertEquals(2, migrated.version)
+                assertEquals(3, migrated.version)
                 assertEquals(newEdge(right), migrated.launchX, 0.0)
                 assertEquals(newEdge(!right), requireNotNull(migrated.firstReturnX), 0.0)
                 assertEquals(newEdge(right), migrated.balls.single().x, 0.0)
@@ -83,7 +83,7 @@ class LegacySnapshotMigrationTest {
                     totalHits = 27, destroyedBlocks = 4,
                 )
                 val engine = restored(legacy)
-                assertEquals(legacy.copy(version = 2, launchX = newEdge(right)), engine.snapshot())
+                assertEquals(legacy.copy(version = 3, launchX = newEdge(right)), engine.snapshot())
                 assertEquals(newEdge(right), engine.nextLaunchX, 0.0)
                 assertEquals(engine.snapshot(), restored(engine.snapshot()).snapshot())
             }
@@ -126,7 +126,7 @@ class LegacySnapshotMigrationTest {
             )
             val engine = restored(legacy)
             assertEquals(legacy.copy(
-                version = 2, launchX = newEdge(right), firstReturnX = newEdge(!right),
+                version = 3, launchX = newEdge(right), firstReturnX = newEdge(!right),
             ), engine.snapshot())
             assertEquals(newEdge(!right), engine.nextLaunchX, 0.0)
             steps(engine, 1)
@@ -152,7 +152,7 @@ class LegacySnapshotMigrationTest {
                     )
                     val input = detached(legacy)
                     val engine = restored(legacy)
-                    assertEquals(legacy.copy(version = 2, balls = listOf(expectedBall)), engine.snapshot())
+                    assertEquals(legacy.copy(version = 3, balls = listOf(expectedBall)), engine.snapshot())
                     assertEquals(input, legacy)
                     assertNotSame(ball, engine.balls.single())
                     assertEquals(hypot(vx, -400.0), hypot(engine.balls.single().vx, engine.balls.single().vy), 0.0)
@@ -171,7 +171,7 @@ class LegacySnapshotMigrationTest {
             val ball = Ball(oldEdge(right), block.y + Board.BLOCK_SIZE + Board.BALL_RADIUS, 0.0, -430.0)
             val legacy = legacyVolley(listOf(ball), blocks = listOf(block))
             val engine = restored(legacy)
-            assertEquals(legacy.copy(version = 2, balls = listOf(ball.copy(x = newEdge(right)))), engine.snapshot())
+            assertEquals(legacy.copy(version = 3, balls = listOf(ball.copy(x = newEdge(right)))), engine.snapshot())
             assertEquals(0L, engine.totalHits)
             assertNull(engine.snapshot().firstReturnX)
             steps(engine, 1)
@@ -196,7 +196,7 @@ class LegacySnapshotMigrationTest {
             val input = detached(legacy)
             val engine = restored(legacy)
             assertEquals(legacy.copy(
-                version = 2, launchX = newEdge(right), firstReturnX = newEdge(right), balls = listOf(safe),
+                version = 3, launchX = newEdge(right), firstReturnX = newEdge(right), balls = listOf(safe),
             ), engine.snapshot())
             assertEquals(input, legacy)
             assertEquals(4, engine.ballCount)
@@ -228,7 +228,7 @@ class LegacySnapshotMigrationTest {
                 val engine = restored(legacy)
                 assertEquals(marker.coerceIn(newEdge(false), newEdge(true)), engine.nextLaunchX, 0.0)
                 assertEquals(legacy.copy(
-                    version = 2, balls = emptyList(), firstReturnX = marker.coerceIn(newEdge(false), newEdge(true)),
+                    version = 3, balls = emptyList(), firstReturnX = marker.coerceIn(newEdge(false), newEdge(true)),
                 ), engine.snapshot())
                 steps(engine, 1)
                 assertEquals(Phase.FIRING, engine.phase)
@@ -277,7 +277,7 @@ class LegacySnapshotMigrationTest {
             val input = detached(legacy)
             val engine = restored(legacy)
             val expected = legacy.copy(
-                version = 2, phase = Phase.ADVANCING, balls = emptyList(), ballCount = 4,
+                version = 3, phase = Phase.ADVANCING, balls = emptyList(), ballCount = 4,
                 launchX = newEdge(false), firstReturnX = null, collectedBalls = 0,
             )
             assertEquals(expected, engine.snapshot())
@@ -362,7 +362,7 @@ class LegacySnapshotMigrationTest {
             "nonfinite ball y" to base.copy(balls = listOf(Ball(16.0, Double.NEGATIVE_INFINITY, 0.0, -430.0))),
             "ball outside old left wall" to base.copy(balls = listOf(Ball(15.999, 320.0, 0.0, -430.0))),
             "ball outside old right wall" to base.copy(balls = listOf(Ball(344.001, 320.0, 0.0, -430.0))),
-            "ball above unchanged ceiling" to base.copy(balls = listOf(Ball(16.0, 11.99, 0.0, -430.0))),
+            "ball above original ceiling" to base.copy(balls = listOf(Ball(16.0, 11.99, 0.0, -430.0))),
             "ball below unchanged floor" to base.copy(balls = listOf(Ball(16.0, 478.01, 0.0, -430.0))),
             "nonfinite velocity in removed lane" to base.copy(balls = listOf(Ball(16.0, 320.0, Double.NaN, -430.0))),
             "motionless ball in removed lane" to base.copy(balls = listOf(Ball(16.0, 320.0, 0.0, 0.0))),
@@ -383,10 +383,10 @@ class LegacySnapshotMigrationTest {
             assertNull(label, GameEngine.restore(invalidSave))
             assertEquals(label, before, invalidSave)
         }
-        for (version in listOf(-1, 0, 3, 99)) assertNull(GameEngine.restore(base.copy(version = version)))
+        for (version in listOf(-1, 0, 99)) assertNull(GameEngine.restore(base.copy(version = version)))
     }
 
-    @Test fun versionTwoStrictlyRejectsLegacyLanePositionsButAcceptsBothNewBoundaryCenters() {
+    @Test fun versionTwoMigrationStillRejectsOldSideLanesAndAcceptsBothBoundaryCenters() {
         for (right in listOf(false, true)) {
             val current = legacyVolley(
                 balls = listOf(Ball(180.0, 250.0, 0.0, -430.0)), firstReturnX = 120.0,
@@ -408,7 +408,7 @@ class LegacySnapshotMigrationTest {
                 balls = listOf(Ball(newEdge(right), 250.0, if (right) 100.0 else -100.0, -400.0)),
             )
             val engine = restored(boundary)
-            assertEquals(boundary, engine.snapshot())
+            assertEquals(boundary.copy(version = 3), engine.snapshot())
             steps(engine, 1)
             assertTrue(engine.balls.single().x in newEdge(false)..newEdge(true))
             assertNotNull(GameEngine.restore(engine.snapshot()))

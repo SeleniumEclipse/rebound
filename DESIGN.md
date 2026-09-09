@@ -13,6 +13,7 @@ The user approved the **Clear multicolor** board and allowed bolder menus, heade
 - The dotted guide is capped at one-third of the board height, or a closer radius-correct collision. No distant endpoint ring: it hints at direction instead of solving the shot.
 - Ceiling and side boundaries are drawn exactly at the collision surfaces. The next-shot marker moves on the first landing without moving the current volley's emitter.
 - Side walls are flush with the unchanged first and last block columns: x=20 and x=338. There is no playable side lane outside the spawn area. The 4-unit interior block spacing is unchanged.
+- The ceiling is flush with the first row at y=20 as well. There is no lane above the spawning area.
 - A short impact ring is feedback, not an ambient effect. Animation can be disabled.
 
 ## Give the menus a stronger identity
@@ -25,7 +26,9 @@ No gradient, glow, glass blur, cream/serif fallback, highlighted headline word, 
 
 ## Audio
 
-Use a recorded gum-bubble pop, not a generated musical tone. The credited CC0 recording is preloaded. Every hit-bearing render frame requests a pop with no 55ms discard gate; simultaneous hits in the same frame share one pop to avoid a delayed audio backlog. Twelve voices allow adjacent pops to finish overlapping. Media volume and the player's Sound setting remain authoritative. Wall bounces are still silent; pops correspond to block hits.
+Use a short, soft UI pop—not a physical gum-bubble snap. The credited **UI_POP_UP.mp3 by Marevnik** was selected from an existing interface-sound listing with approximately 9,600 downloads, 247 ratings, and comments including “Exactly what I needed! Thanks.” These are observed page figures, not proof that every player will prefer it.
+
+The sample is decoded ahead of time into PCM, trimmed to about 71ms, and slightly attenuated. No substitute oscillator or musical beep is synthesized. A persistent AudioTrack mixes overlapping pops, and the game passes the actual number of hits rather than collapsing a frame to one event. Small same-frame groups get closely spaced onsets; extreme hit storms combine weighted onsets instead of building a long delayed queue. A soft limiter avoids hard clipping. Media volume and the player's Sound setting remain authoritative. Wall bounces are still silent; pops correspond to block hits.
 
 ## References
 

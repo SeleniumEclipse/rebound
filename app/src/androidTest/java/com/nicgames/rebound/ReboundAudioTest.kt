@@ -1,15 +1,12 @@
 package com.nicgames.rebound
 
 import android.media.AudioManager
-import android.media.MediaCodec
-import android.media.MediaExtractor
-import android.media.MediaFormat
 import androidx.compose.ui.test.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.nio.ByteOrder
+import com.nicgames.rebound.audio.PopSample
 import java.security.MessageDigest
 
 @RunWith(AndroidJUnit4::class)
@@ -26,6 +23,10 @@ class ReboundAudioTest : ReboundUiTest() {
         val count = compose.activity.soundPlaybackCount
         click("Test sound")
         assertEquals(count + 1, compose.activity.soundPlaybackCount)
+        compose.waitUntil(5000) { compose.activity.soundPlayedFrames > 2000 }
+        assertTrue("Actual nonzero PCM was written to AudioTrack", compose.activity.soundAudibleFrames > 500)
+        assertTrue(compose.activity.soundWrittenFrames > 2000)
+        assertEquals(0, compose.activity.soundWriteFailures)
         assertEquals(volume, manager.getStreamVolume(AudioManager.STREAM_MUSIC))
         click("Sound")
         compose.onNodeWithText("Test sound").assertIsNotEnabled()
@@ -42,7 +43,9 @@ class ReboundAudioTest : ReboundUiTest() {
         click("Continue")
         advance(96)
         assertTrue("Fixture must actually hit a block", snapshot().totalHits > 0)
-        assertTrue("Rendered game's impact callback must reach SoundPool", compose.activity.soundPlaybackCount > count)
+        assertTrue("Rendered game's impact callback must reach the audio mixer", compose.activity.soundPlaybackCount > count)
+        compose.waitUntil(5000) { compose.activity.soundPlayedFrames > 2000 }
+        assertTrue(compose.activity.soundAudibleFrames > 500)
     }
 
     @Test
@@ -58,58 +61,16 @@ class ReboundAudioTest : ReboundUiTest() {
     }
 
     @Test
-    fun bundledRecordedPopDecodesToSignalAndMatchesLicensedSource() {
-        val bytes = targetContext.resources.openRawResource(R.raw.block_pop).use { it.readBytes() }
+    fun bundledUiPopContainsPromptSoftPcmAndRequiredAttribution() {
+        val bytes = targetContext.resources.openRawResource(R.raw.ui_pop).use { it.readBytes() }
         val hash = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
-        assertEquals("Exact unmodified CC0 source preview", "09a72dba775c2407cd2227fb5fceb385d5dd18979fc1715f4d07c63d5f444a83", hash)
+        assertEquals("Prepared reviewed UI sound", "d2e5adfec812a575e242ba69507a11e1e6f336ec940bbe971a4bfe39b9082919", hash)
         val credit = targetContext.resources.openRawResource(R.raw.audio_credit).bufferedReader().use { it.readText() }
-        assertTrue(credit.contains("Mafon2") && credit.contains("CC0"))
-        val extractor = MediaExtractor()
-        targetContext.resources.openRawResourceFd(R.raw.block_pop).use { fd ->
-            extractor.setDataSource(fd.fileDescriptor, fd.startOffset, fd.length)
-        }
-        val format = extractor.getTrackFormat(0)
-        assertTrue(format.getLong(MediaFormat.KEY_DURATION) in 100_000L..500_000L)
-        extractor.selectTrack(0)
-        val decoder = MediaCodec.createDecoderByType(requireNotNull(format.getString(MediaFormat.KEY_MIME)))
-        var sum = 0.0
-        var samples = 0
-        var ended = false
-        try {
-            decoder.configure(format, null, null, 0)
-            decoder.start()
-            var inputEnded = false
-            val info = MediaCodec.BufferInfo()
-            val deadline = android.os.SystemClock.uptimeMillis() + 5000
-            while (!ended && android.os.SystemClock.uptimeMillis() < deadline) {
-                if (!inputEnded) {
-                    val input = decoder.dequeueInputBuffer(10_000)
-                    if (input >= 0) {
-                        val data = requireNotNull(decoder.getInputBuffer(input))
-                        val length = extractor.readSampleData(data, 0)
-                        if (length < 0) {
-                            inputEnded = true
-                            decoder.queueInputBuffer(input, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                        } else {
-                            decoder.queueInputBuffer(input, 0, length, extractor.sampleTime, 0)
-                            extractor.advance()
-                        }
-                    }
-                }
-                val output = decoder.dequeueOutputBuffer(info, 10_000)
-                if (output >= 0) {
-                    val data = requireNotNull(decoder.getOutputBuffer(output)).duplicate().order(ByteOrder.LITTLE_ENDIAN)
-                    data.position(info.offset); data.limit(info.offset + info.size)
-                    while (data.remaining() >= 2) { val sample = data.short / 32768.0; sum += sample * sample; samples++ }
-                    ended = info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
-                    decoder.releaseOutputBuffer(output, false)
-                }
-            }
-            decoder.stop()
-        } finally { decoder.release(); extractor.release() }
-        assertTrue("Recorded pop must finish decoding", ended)
-        assertTrue("Decoded sample contains a usable recording", samples > 4000)
-        assertTrue("Pop must not be silent", kotlin.math.sqrt(sum / samples) > .02)
+        assertTrue(credit.contains("Marevnik") && credit.contains("Attribution 4.0"))
+        val samples = PopSample.decode(bytes)
+        assertTrue(samples.size / 44100.0 in .04.. .10)
+        assertTrue(samples.indexOfFirst { kotlin.math.abs(it.toInt()) > 655 } < 529)
+        assertTrue(samples.maxOf { kotlin.math.abs(it.toInt()) } < 22_000)
     }
 
     @Test
@@ -122,11 +83,58 @@ class ReboundAudioTest : ReboundUiTest() {
                 assertTrue("An immediately following hit must also play", audio.hit())
                 assertTrue("A third close hit must also play", audio.hit())
                 assertEquals(3, audio.playbackCount)
-                audio.stop()
-                assertTrue(audio.hit())
-                assertEquals(4, audio.playbackCount)
             }
+            compose.waitUntil(5000) { audio.playedFrames > 2500 }
+            assertTrue(audio.audibleFrames > 500)
+            assertEquals(0, audio.writeFailures)
+            val flush = audio.flushCount
+            compose.runOnIdle { audio.stop() }
+            compose.waitUntil(5000) { audio.flushCount > flush }
+            val written = audio.writtenFrames
+            val audible = audio.audibleFrames
+            compose.runOnIdle { assertTrue(audio.hit()); assertEquals(4, audio.playbackCount) }
+            compose.waitUntil(5000) { audio.playedFrames > 2500 }
+            assertTrue(audio.writtenFrames > written + 2500)
+            assertTrue(audio.audibleFrames > audible + 500)
         } finally { compose.runOnIdle { audio.release() } }
-        assertFalse("A released pool cannot play", audio.hit())
+        assertFalse("A released output cannot play", audio.hit())
+    }
+
+    @Test
+    @LaunchWith(ReboundFixture.SAME_FRAME_HITS)
+    fun simultaneousHitsAreNotCollapsedIntoOneAudioRequest() {
+        waitForAudio()
+        modelValue { if (!it.sound) it.toggleSound() }
+        val count = compose.activity.soundPlaybackCount
+        click("Continue")
+        advance(64)
+        assertEquals(3L, snapshot().totalHits)
+        assertEquals(3, compose.activity.soundPlaybackCount - count)
+        compose.waitUntil(5000) { compose.activity.soundPlayedFrames > 2500 }
+        assertTrue(compose.activity.soundAudibleFrames > 500)
+        assertEquals(0, compose.activity.soundWriteFailures)
+    }
+
+    @Test
+    fun isolatedPopsContinueReachingTheDeviceAfterEachAudioBufferDrains() {
+        val audio = compose.runOnIdle { GameAudio(targetContext) }
+        try {
+            var lastWritten = 0L
+            var lastAudible = 0L
+            repeat(8) {
+                compose.runOnIdle { assertTrue(audio.hit()) }
+                compose.waitUntil(5000) { audio.idle && audio.writtenFrames > lastWritten + 3000 }
+                val expected = audio.writtenFrames
+                compose.waitUntil(5000) { audio.playedFrames >= expected }
+                assertTrue("Each isolated pop writes fresh nonzero PCM", audio.audibleFrames > lastAudible + 500)
+                lastWritten = audio.writtenFrames
+                lastAudible = audio.audibleFrames
+            }
+            assertEquals(8, audio.playbackCount)
+            assertEquals(0, audio.writeFailures)
+            java.io.File(targetContext.filesDir, "audio-output-evidence.json").writeText(
+                """{"isolatedPops":8,"writtenFrames":${audio.writtenFrames},"playedFrames":${audio.playedFrames},"nonzeroFrames":${audio.audibleFrames},"writeFailures":${audio.writeFailures}}""",
+            )
+        } finally { compose.runOnIdle { audio.release() } }
     }
 }

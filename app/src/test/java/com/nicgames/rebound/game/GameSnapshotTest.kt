@@ -32,7 +32,7 @@ class GameSnapshotTest {
         original.tick(0.123)
         assertTrue(original.snapshot().accumulator > 0.0)
         assertTrue(original.snapshot().pendingLaunches > 20)
-        assertEquals(2, original.snapshot().version)
+        assertEquals(3, original.snapshot().version)
         val resumed = jsonRestore(original)
         assertEquals(original.snapshot(), resumed.snapshot())
         repeat(240) {
@@ -267,7 +267,7 @@ class GameSnapshotTest {
             "unbounded collection" to base.copy(collectedBalls = 71),
             "nonfinite position" to base.copy(balls = listOf(Ball(Double.NaN, 400.0, 0.0, -430.0))),
             "left of wall" to base.copy(balls = listOf(Ball(15.0, 400.0, 0.0, -430.0))),
-            "above ceiling" to base.copy(balls = listOf(Ball(180.0, 11.0, 0.0, -430.0))),
+            "above ceiling" to base.copy(balls = listOf(Ball(180.0, Board.TOP + Board.BALL_RADIUS - 0.001, 0.0, -430.0))),
             "below landing floor" to base.copy(balls = listOf(Ball(180.0, 479.0, 0.0, -430.0))),
             "nonfinite velocity" to base.copy(balls = listOf(Ball(180.0, 400.0, Double.POSITIVE_INFINITY, -430.0))),
             "motionless ball" to base.copy(balls = listOf(Ball(180.0, 400.0, 0.0, 0.0))),

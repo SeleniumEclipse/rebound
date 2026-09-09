@@ -10,6 +10,26 @@ import org.junit.Test
 
 class ReboundBoardEdgesTest : ReboundUiTest() {
     @Test
+    @LaunchWith(ReboundFixture.LEGACY_CEILING)
+    fun oldCeilingLaneSaveReturnsTrappedBallAndKeepsTheRun() {
+        val migrated = snapshot()
+        assertEquals(3, migrated.version)
+        assertEquals(42, migrated.round)
+        assertEquals(3, migrated.ballCount)
+        assertEquals(41.0, requireNotNull(migrated.firstReturnX), 0.0)
+        assertEquals(1, migrated.balls.size)
+        assertEquals(0L, migrated.totalHits)
+        assertEquals(9, migrated.blocks.single().hits)
+        recreateWithFreshModel()
+        assertEquals(migrated, snapshot())
+        click("Continue")
+        advance(64)
+        assertTrue(snapshot().balls.all { it.y >= Board.TOP + Board.BALL_RADIUS })
+        assertEquals(3, snapshot().ballCount)
+        assertEquals(0, snapshot().pendingLaunches)
+    }
+
+    @Test
     @LaunchWith(ReboundFixture.ROUND_42)
     fun visibleWallsAndFloorMeetTheOuterSpawnColumnsWithoutLanes() {
         click("Continue")
@@ -23,6 +43,8 @@ class ReboundBoardEdgesTest : ReboundUiTest() {
         assertTrue(red(338.0, 300.0) < .7f)
         assertTrue("No old left wall farther outside the tile area", red(12.0, 300.0) > .8f)
         assertTrue("No old right wall farther outside the tile area", red(348.0, 300.0) > .8f)
+        assertTrue("Ceiling is flush with the top row", red(180.0, 20.0) < .7f)
+        assertTrue("No old ceiling above the spawning area", red(180.0, 8.0) > .8f)
         assertTrue(red(21.0, Board.FLOOR) < .7f)
         assertTrue(red(337.0, Board.FLOOR) < .7f)
         assertTrue(red(14.0, Board.FLOOR) > .8f)
@@ -35,7 +57,7 @@ class ReboundBoardEdgesTest : ReboundUiTest() {
     @LaunchWith(ReboundFixture.LEGACY_EDGE)
     fun oldMidVolleySaveMigratesAtAppStartupWithoutLosingTheRun() {
         val migrated = snapshot()
-        assertEquals(2, migrated.version)
+        assertEquals(3, migrated.version)
         assertEquals(42, migrated.round)
         assertEquals(3, migrated.ballCount)
         assertEquals(24.0, migrated.launchX, 0.0)
