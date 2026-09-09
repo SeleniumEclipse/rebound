@@ -389,7 +389,7 @@ class GameEngine private constructor(seed: Long, initialize: Boolean) {
     }
 
     private fun spawnRow() {
-        val columns = IntArray(COLUMNS) { it }
+        val columns = IntArray(Board.COLUMNS) { it }
         for (i in columns.lastIndex downTo 1) {
             val j = random.nextInt(i + 1)
             val swap = columns[i]
@@ -427,9 +427,11 @@ class GameEngine private constructor(seed: Long, initialize: Boolean) {
         private const val MAX_IMPACTS = 64
         private const val IMPACT_LIFETIME = 0.18
         private const val MAX_BALLS = 999
-        private const val COLUMNS = 7
         private const val MIN_X = Board.LEFT + Board.BALL_RADIUS
         private const val MAX_X = Board.RIGHT - Board.BALL_RADIUS
+        // Frozen version-1 ball-center limits; do not derive these from the new walls.
+        private const val LEGACY_MIN_X = 16.0
+        private const val LEGACY_MAX_X = 344.0
         private const val MIN_Y = Board.TOP + Board.BALL_RADIUS
         private const val LANDING_Y = Board.FLOOR - Board.BALL_RADIUS
 
@@ -442,33 +444,79 @@ class GameEngine private constructor(seed: Long, initialize: Boolean) {
 
         /** Rejects corrupt, nonfinite, overlapping, oversized, or inconsistent state. */
         fun restore(snapshot: GameSnapshot): GameEngine? {
-            if (!validSnapshot(snapshot)) return null
-            return GameEngine(snapshot.rngState, false).apply {
-                phase = snapshot.phase
-                round = snapshot.round
-                ballCount = snapshot.ballCount
-                launchX = snapshot.launchX
-                mutableBlocks.addAll(snapshot.blocks.map { it.copy() })
-                mutablePickups.addAll(snapshot.pickups.map { it.copy() })
-                mutableBalls.addAll(snapshot.balls.map { it.copy() })
-                mutableImpacts.addAll(snapshot.impacts.map { it.copy() })
-                shotElapsed = snapshot.shotElapsed
-                advanceProgress = snapshot.advanceProgress
-                totalHits = snapshot.totalHits
-                destroyedBlocks = snapshot.destroyedBlocks
-                nextId = snapshot.nextId
-                pendingLaunches = snapshot.pendingLaunches
-                launchCountdown = snapshot.launchCountdown
-                shotAngle = snapshot.shotAngle
-                firstReturnX = snapshot.firstReturnX
-                collectedBalls = snapshot.collectedBalls
-                accumulator = snapshot.accumulator
+            val state = when (snapshot.version) {
+                1 -> {
+                    // Validate the ORIGINAL save first. Clamping must never repair corruption.
+                    if (!validSnapshot(snapshot, LEGACY_MIN_X, LEGACY_MAX_X)) return null
+                    migrateLegacySnapshot(snapshot)
+                }
+                2 -> snapshot
+                else -> return null
+            }
+            // Migration must produce a fully valid new save before constructing an engine.
+            if (!validSnapshot(state)) return null
+            return GameEngine(state.rngState, false).apply {
+                phase = state.phase
+                round = state.round
+                ballCount = state.ballCount
+                launchX = state.launchX
+                mutableBlocks.addAll(state.blocks.map { it.copy() })
+                mutablePickups.addAll(state.pickups.map { it.copy() })
+                mutableBalls.addAll(state.balls.map { it.copy() })
+                mutableImpacts.addAll(state.impacts.map { it.copy() })
+                shotElapsed = state.shotElapsed
+                advanceProgress = state.advanceProgress
+                totalHits = state.totalHits
+                destroyedBlocks = state.destroyedBlocks
+                nextId = state.nextId
+                pendingLaunches = state.pendingLaunches
+                launchCountdown = state.launchCountdown
+                shotAngle = state.shotAngle
+                firstReturnX = state.firstReturnX
+                collectedBalls = state.collectedBalls
+                accumulator = state.accumulator
             }
         }
 
-        private fun validSnapshot(s: GameSnapshot): Boolean {
-            if (s.version != 1 || s.round < 1 || s.ballCount !in 1..MAX_BALLS) return false
-            if (!s.launchX.isFinite() || s.launchX !in MIN_X..MAX_X) return false
+        private fun migrateLegacySnapshot(s: GameSnapshot): GameSnapshot {
+            val balls = ArrayList<Ball>(s.balls.size)
+            var returnedX: Double? = null
+            for (savedBall in s.balls) {
+                val ball = savedBall.copy()
+                if (ball.x !in MIN_X..MAX_X) {
+                    ball.x = ball.x.coerceIn(MIN_X, MAX_X)
+                    if (s.blocks.any { Collision.overlapsBox(ball, it) }) {
+                        // The removed side lane can border a solid block. Return this ball
+                        // directly to the floor, without sweeping, damage, or pickup awards.
+                        // Simultaneous forced returns use the same leftmost tie-break as landings.
+                        returnedX = min(returnedX ?: ball.x, ball.x)
+                        continue
+                    }
+                    if ((ball.x == MIN_X && ball.vx < 0.0) || (ball.x == MAX_X && ball.vx > 0.0)) {
+                        ball.vx = -ball.vx
+                    }
+                }
+                balls.add(ball)
+            }
+            val migrated = s.copy(
+                version = 2, balls = balls, launchX = s.launchX.coerceIn(MIN_X, MAX_X),
+                firstReturnX = s.firstReturnX?.coerceIn(MIN_X, MAX_X) ?: returnedX,
+            )
+            if (migrated.phase != Phase.FIRING || balls.isNotEmpty() || migrated.pendingLaunches > 0) {
+                return migrated
+            }
+            // All remaining balls returned during migration: perform finishVolley's state
+            // transition once, retaining already-earned pickups and leaving the rows unadvanced.
+            return migrated.copy(
+                phase = Phase.ADVANCING, launchX = migrated.firstReturnX ?: migrated.launchX,
+                ballCount = (migrated.ballCount + migrated.collectedBalls).coerceAtMost(MAX_BALLS),
+                collectedBalls = 0, firstReturnX = null, launchCountdown = 0.0, advanceProgress = 0.0,
+            )
+        }
+
+        private fun validSnapshot(s: GameSnapshot, minX: Double = MIN_X, maxX: Double = MAX_X): Boolean {
+            if (s.version !in 1..2 || s.round < 1 || s.ballCount !in 1..MAX_BALLS) return false
+            if (!s.launchX.isFinite() || s.launchX !in minX..maxX) return false
             if (!validAngle(s.shotAngle)) return false
             if (!s.accumulator.isFinite() || s.accumulator < 0.0 || s.accumulator >= FIXED_STEP) return false
             val deadline = volleyDeadline(s.ballCount)
@@ -480,7 +528,7 @@ class GameEngine private constructor(seed: Long, initialize: Boolean) {
             if (s.balls.size > s.ballCount || s.pendingLaunches !in 0 until s.ballCount) return false
             if (s.balls.size + s.pendingLaunches > s.ballCount || s.collectedBalls !in 0..70) return false
             if (!s.launchCountdown.isFinite() || s.launchCountdown !in 0.0..RELEASE_INTERVAL) return false
-            if (s.firstReturnX != null && (!s.firstReturnX.isFinite() || s.firstReturnX !in MIN_X..MAX_X)) return false
+            if (s.firstReturnX != null && (!s.firstReturnX.isFinite() || s.firstReturnX !in minX..maxX)) return false
             if (s.phase == Phase.FIRING) {
                 if ((s.balls.isEmpty() && s.pendingLaunches == 0) || s.shotElapsed >= deadline) return false
                 if (s.pendingLaunches > 0 && s.launchCountdown <= 0.0) return false
@@ -497,22 +545,22 @@ class GameEngine private constructor(seed: Long, initialize: Boolean) {
             for (block in s.blocks) {
                 val maxRow = if (s.phase == Phase.GAME_OVER) 9 else 8
                 if (block.id < 1 || block.id >= s.nextId || !ids.add(block.id)) return false
-                if (block.column !in 0 until COLUMNS || block.row !in 0..maxRow || block.hits < 1) return false
-                if (!occupied.add(block.row * COLUMNS + block.column)) return false
+                if (block.column !in 0 until Board.COLUMNS || block.row !in 0..maxRow || block.hits < 1) return false
+                if (!occupied.add(block.row * Board.COLUMNS + block.column)) return false
             }
             for (pickup in s.pickups) {
                 if (pickup.id < 1 || pickup.id >= s.nextId || !ids.add(pickup.id)) return false
-                if (pickup.column !in 0 until COLUMNS || pickup.row !in 0..9) return false
-                if (!occupied.add(pickup.row * COLUMNS + pickup.column)) return false
+                if (pickup.column !in 0 until Board.COLUMNS || pickup.row !in 0..9) return false
+                if (!occupied.add(pickup.row * Board.COLUMNS + pickup.column)) return false
             }
             // A full row cannot arise from the generator and closes off every playable lane.
             if (s.blocks.groupingBy { it.row }.eachCount().values.any { it > 4 }) return false
             if (s.pickups.groupingBy { it.row }.eachCount().values.any { it > 1 }) return false
-            if (occupied.groupingBy { it / COLUMNS }.eachCount().values.any { it > 5 }) return false
+            if (occupied.groupingBy { it / Board.COLUMNS }.eachCount().values.any { it > 5 }) return false
             if (s.phase == Phase.GAME_OVER && s.blocks.none { it.row == 9 }) return false
             for (ball in s.balls) {
                 if (!ball.x.isFinite() || !ball.y.isFinite() || !ball.vx.isFinite() || !ball.vy.isFinite()) return false
-                if (ball.x !in MIN_X..MAX_X || ball.y !in MIN_Y..LANDING_Y) return false
+                if (ball.x !in minX..maxX || ball.y !in MIN_Y..LANDING_Y) return false
                 val speed = hypot(ball.vx, ball.vy)
                 if (speed < 1e-6 || speed > 10_000.0) return false
                 if (s.blocks.any { Collision.overlapsBox(ball, it) }) return false

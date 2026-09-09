@@ -15,7 +15,7 @@ A clean, colorful ball-and-block game for Android. Aim a stream of balls, wear d
 - **Speed up** temporarily uses 6× until the current volley ends, then restores your chosen speed. It is not shown when your preferred speed is already 6×. **Collect** ends a long volley early, keeping damage and pickups already earned.
 - The next-shot marker moves as soon as the first ball lands. Remaining balls in that volley still launch from the original position.
 - Pause whenever needed. Your run, best round, and settings are saved on the device, including an interrupted volley.
-- Block hits use a short original impact sound. In **Settings**, turn Sound on and use **Test sound**; the phone's volume buttons adjust media volume. The app never raises system volume automatically.
+- Block hits use **Bubble Pop**, a CC0 gum-bubble recording by Mafon2, rather than a synthesized tone. Closely spaced hit frames can overlap; there is no time-based sound cutoff. In **Settings**, turn Sound on and use **Test sound**; the phone's volume buttons adjust media volume. The app never raises system volume automatically.
 
 No ads, accounts, tracking, or Internet connection. Requires **Android 8.0 or newer**. Portrait gameplay.
 
@@ -51,7 +51,8 @@ That file contains `storeFile`, `storePassword`, `keyAlias`, and `keyPassword`. 
 ## Implementation
 
 - Pure Kotlin, fixed-step simulation with continuous circle/rectangle collision detection and chronological shared-block impacts.
-- Short radius-aware aiming hints, visible ceiling and walls, capped visual effects, sequential volleys up to 999 balls, and deterministic random rows.
+- Short radius-aware aiming hints, visible ceiling and walls flush with the outer block columns, capped visual effects, sequential volleys up to 999 balls, and deterministic random rows.
+- Earlier saves are migrated to the tighter side walls without clearing progress. A ball stranded in a removed side lane is safely returned if moving it inward would overlap a block.
 - Separate Compose interface, local versioned save snapshots, lifecycle pause, optional sound, vibration, and animation.
 - For low vision, controls are labeled and keyboard/TalkBack aiming actions are available. The moving visual board is **not claimed to be fully playable without sight**.
 

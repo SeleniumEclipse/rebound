@@ -29,7 +29,7 @@ class GameEngineTest {
             assertTrue(engine.blocks.all { it.hits == 1 && it.row == 0 })
             val occupied = engine.blocks.map { it.column } + engine.pickups.map { it.column }
             assertEquals(occupied.size, occupied.toSet().size)
-            assertTrue(7 - occupied.size >= 2)
+            assertTrue(Board.COLUMNS - occupied.size >= 2)
         }
     }
 
@@ -250,14 +250,16 @@ class GameEngineTest {
     }
 
     @Test fun sideWallMirrorsOnlyRelevantComponent() {
-        val engine = fixture(balls = listOf(Ball(17.0, 100.0, -400.0, 100.0)))
+        val engine = fixture(balls = listOf(Ball(Board.LEFT + Board.BALL_RADIUS + 1.0, 100.0, -400.0, 100.0)))
         steps(engine, 1)
         assertEquals(400.0, engine.balls.single().vx, 1e-10)
         assertEquals(100.0, engine.balls.single().vy, 1e-10)
     }
 
     @Test fun exactTwoWallCornerNormalizesReflectionAndPreservesSpeed() {
-        val engine = fixture(balls = listOf(Ball(17.0, 13.0, -300.0, -300.0)))
+        val engine = fixture(balls = listOf(Ball(
+            Board.LEFT + Board.BALL_RADIUS + 1.0, Board.TOP + Board.BALL_RADIUS + 1.0, -300.0, -300.0,
+        )))
         steps(engine, 1)
         assertEquals(300.0, engine.balls.single().vx, 1e-9)
         assertEquals(300.0, engine.balls.single().vy, 1e-9)
@@ -265,7 +267,9 @@ class GameEngineTest {
     }
 
     @Test fun unequalVelocityWallCornerMirrorsRatherThanSwapsComponents() {
-        val engine = fixture(balls = listOf(Ball(18.0, 12.5, -400.0, -100.0)))
+        val engine = fixture(balls = listOf(Ball(
+            Board.LEFT + Board.BALL_RADIUS + 2.0, Board.TOP + Board.BALL_RADIUS + 0.5, -400.0, -100.0,
+        )))
         steps(engine, 1)
         assertEquals(400.0, engine.balls.single().vx, 1e-9)
         assertEquals(100.0, engine.balls.single().vy, 1e-9)

@@ -319,7 +319,7 @@ private fun GameBoard(model: AppModel, revision: Int, modifier: Modifier) {
                     drawCircle(Ink.copy(alpha = alpha), (4.0 + impact.age * 25).toFloat(), Offset(impact.x.toFloat(), impact.y.toFloat()), style = Stroke(1.3f))
                 }
                 val danger = game.blocks.any { it.row >= 8 }
-                drawLine(if (danger) Color(0xFFBB3026) else Color(0xFF879297), Offset(12f, 482f), Offset(348f, 482f), if (danger) 2.5f else 1.2f)
+                drawLine(if (danger) Color(0xFFBB3026) else Color(0xFF879297), Offset(Board.LEFT.toFloat(), Board.FLOOR.toFloat()), Offset(Board.RIGHT.toFloat(), Board.FLOOR.toFloat()), if (danger) 2.5f else 1.2f)
                 drawRect(Ink, Offset(game.nextLaunchX.toFloat() - 10, 490f), Size(20f, 3f))
             }
         }
@@ -446,6 +446,7 @@ private fun SettingRow(title: String, checked: Boolean, toggle: () -> Unit) {
 private fun LicensesScreen(model: AppModel) {
     val context = LocalContext.current
     val licenses = remember { context.resources.openRawResource(R.raw.font_licenses).bufferedReader().use { it.readText() } }
+    val audioCredit = remember { context.resources.openRawResource(R.raw.audio_credit).bufferedReader().use { it.readText() } }
     Column(Modifier.fillMaxSize()) {
         PageHeader("About", model::back)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -453,6 +454,7 @@ private fun LicensesScreen(model: AppModel) {
             Label("Version ${BuildConfig.VERSION_NAME}")
             Label("An offline ball-and-block game. No ads, accounts, tracking, or network access. Progress and settings stay on this device.")
             Label("Original game code and graphics. Not affiliated with Ballz or Ketchapp.")
+            Label(audioCredit)
             Label("Fonts: Archivo and Archivo Black, by the Archivo Project Authors. SIL Open Font License.", strong = true)
             Label("AndroidX and Material icons: Apache License 2.0. Kotlin: Apache License 2.0.")
             Text(licenses, fontFamily = Archivo, fontSize = 12.sp, lineHeight = 18.sp, color = Ink)

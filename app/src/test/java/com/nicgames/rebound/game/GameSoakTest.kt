@@ -31,8 +31,8 @@ class GameSoakTest {
                 if (engine.balls.size >= 200) sawManyActiveBalls = true
                 for (ball in engine.balls) {
                     assertTrue(ball.x.isFinite() && ball.y.isFinite())
-                    assertTrue(ball.x in 16.0..344.0)
-                    assertTrue(ball.y in 12.0..478.0)
+                    assertTrue(ball.x in (Board.LEFT + Board.BALL_RADIUS)..(Board.RIGHT - Board.BALL_RADIUS))
+                    assertTrue(ball.y in (Board.TOP + Board.BALL_RADIUS)..(Board.FLOOR - Board.BALL_RADIUS))
                     assertEquals(430.0, hypot(ball.vx, ball.vy), 1e-7)
                     assertTrue(engine.blocks.none { Collision.overlapsBox(ball, it) })
                 }
@@ -96,7 +96,7 @@ class GameSoakTest {
             assertEquals(Phase.FIRING, engine.phase)
             val ball = engine.balls.single()
             assertTrue(ball.x.isFinite() && ball.y.isFinite())
-            assertTrue(ball.x in 16.0..344.0)
+            assertTrue(ball.x in (Board.LEFT + Board.BALL_RADIUS)..(Board.RIGHT - Board.BALL_RADIUS))
             assertEquals(10_000.0, hypot(ball.vx, ball.vy), 1e-7)
         }
         assertNotNull(GameEngine.restore(engine.snapshot()))

@@ -32,6 +32,7 @@ class GameSnapshotTest {
         original.tick(0.123)
         assertTrue(original.snapshot().accumulator > 0.0)
         assertTrue(original.snapshot().pendingLaunches > 20)
+        assertEquals(2, original.snapshot().version)
         val resumed = jsonRestore(original)
         assertEquals(original.snapshot(), resumed.snapshot())
         repeat(240) {
@@ -192,7 +193,7 @@ class GameSnapshotTest {
     @Test fun invalidScalarSnapshotsAreRejected() {
         val base = emptySnapshot()
         val invalid = listOf(
-            "unknown version" to base.copy(version = 2),
+            "unknown version" to base.copy(version = 99),
             "zero round" to base.copy(round = 0),
             "zero balls" to base.copy(ballCount = 0),
             "too many balls" to base.copy(ballCount = 1000),

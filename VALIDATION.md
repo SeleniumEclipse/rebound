@@ -1,5 +1,23 @@
 # Rebound validation
 
+## Version 1.2.0 — 9 September 2026
+
+**118 JVM tests passed**, zero failures: the previous 98 plus five board-edge test methods (many left/right/angle/corner combinations) and 15 legacy-save migration tests. The edge tests confirm walls exactly at the seven-column grid boundaries, circle-aware aiming, one underside hit rather than a side-lane hit storm, finite motion, conserved velocity, and correct corner/wall behavior.
+
+Migration tests cover both old edges, first-return markers, pending launch queues, forced returns without damage/rewards, earned-pickup commitment exactly once, no mutation of saved objects, rejection of corrupt states, and version-2 JSON round trips. Missing engine version in old JSON still means version 1; new snapshots always encode version 2. The outer preference-save version stays compatible.
+
+**33 Android tests passed** on the isolated ReboundTest Android 14 device. Additions prove:
+- Visible walls and floor end at the actual outer block columns, not the old padded positions.
+- A real old-format app save containing a ball in a removed side lane loads, resumes, and survives another restart.
+- Three close successive hit frames each reach sound playback; three immediate SoundPool calls are no longer filtered by a 55ms gate.
+- The exact bundled MP3 matches its licensed source hash and decodes on Android into non-silent PCM. Sound mute and media-volume behavior remain tested.
+
+**Signed-release smoke: seven checks passed** after installing over the earlier app, including real pull-back input, slider setting to 3.2×, round completion, pause, and process restart with run/preference restoration. Release lint and editor diagnostics: **zero errors**. The new wall screenshot was visually inspected.
+
+APK: **1,026,484 bytes**, SHA-256 **9ec69602e49a85a440735872208befc1dcfafa091f9eb19ccb3982955e3331d0**. Package unchanged; versionCode 3 and versionName 1.2.0.
+
+Audio source: CC0 “Bubble Pop” by Mafon2, an author-described gum-bubble recording. The public high-quality preview is bundled unchanged and credited; the synthesized WAV is removed. Audio is one pop per hit-bearing render frame with up to 12 overlapping voices, not a promise of individually distinguishable pops for hundreds of simultaneous collisions. Tests prove decoding and playback requests, not subjective sound quality on the user's handset. Host audio was disabled in the emulator.
+
 ## Version 1.1.0 — 9 September 2026
 
 **98 JVM tests passed**, including all previous engine tests plus seven first-landing/queued-emitter tests, eight pull-back aiming tests, and four short-guide geometry tests.

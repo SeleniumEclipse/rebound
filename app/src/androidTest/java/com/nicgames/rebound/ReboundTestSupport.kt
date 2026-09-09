@@ -50,7 +50,7 @@ import kotlin.math.min
 @Retention(AnnotationRetention.RUNTIME)
 annotation class LaunchWith(val value: ReboundFixture, val helpSeen: Boolean = true)
 
-enum class ReboundFixture { EMPTY, ROUND_42, MID_FLIGHT, BEFORE_LOSS, FIRST_LANDING, NEXT_HIT }
+enum class ReboundFixture { EMPTY, ROUND_42, MID_FLIGHT, BEFORE_LOSS, FIRST_LANDING, NEXT_HIT, RAPID_HITS, LEGACY_EDGE }
 
 internal object ReboundFixtures {
     fun round42(): GameSnapshot = checked(GameEngine(4242L).snapshot().copy(
@@ -100,6 +100,17 @@ internal object ReboundFixtures {
             ReboundFixture.NEXT_HIT -> checked(round42().copy(
                 phase = Phase.FIRING, ballCount = 1, blocks = listOf(Block(1, 0, 0, 9)), pickups = emptyList(),
                 balls = listOf(Ball(41.0, 76.0, 0.0, -430.0)), shotAngle = -Math.PI / 2,
+            ))
+            ReboundFixture.RAPID_HITS -> checked(round42().copy(
+                phase = Phase.FIRING, ballCount = 3, blocks = listOf(Block(1, 0, 0, 9)), pickups = emptyList(),
+                balls = listOf(Ball(41.0, 69.0, 0.0, -430.0), Ball(41.0, 80.0, 0.0, -430.0), Ball(41.0, 91.0, 0.0, -430.0)),
+                shotAngle = -Math.PI / 2,
+            ))
+            ReboundFixture.LEGACY_EDGE -> checked(round42().copy(
+                version = 1, phase = Phase.FIRING, ballCount = 3, launchX = 16.0,
+                blocks = listOf(Block(1, 0, 6, 9)), pickups = emptyList(),
+                balls = listOf(Ball(16.0, 320.0, 0.0, -430.0), Ball(180.0, 200.0, 0.0, -430.0)),
+                pendingLaunches = 1, launchCountdown = .04, shotAngle = -Math.PI / 2,
             ))
         }
         // Only app-local preferences are changed. No emulator-wide audio/animation settings.
