@@ -1,0 +1,1 @@
+# Kotlin serialization emits serializers at compile time. No reflection-based models.
