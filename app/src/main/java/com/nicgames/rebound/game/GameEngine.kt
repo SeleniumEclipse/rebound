@@ -45,6 +45,9 @@ class GameEngine private constructor(seed: Long, initialize: Boolean) {
     private var launchCountdown = 0.0
     private var shotAngle = -PI / 2.0
     private var firstReturnX: Double? = null
+    /** Next turn's marker, available as soon as the first ball lands. The current
+     * volley still emits its queued balls from the unchanged launchX. */
+    val nextLaunchX: Double get() = firstReturnX ?: launchX
     private var collectedBalls = 0
     private var accumulator = 0.0
 

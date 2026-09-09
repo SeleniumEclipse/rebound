@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -14,8 +15,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.sharp.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,15 +41,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.res.ResourcesCompat
 import com.nicgames.rebound.AppModel
+import com.nicgames.rebound.BuildConfig
 import com.nicgames.rebound.R
 import com.nicgames.rebound.Screen
 import com.nicgames.rebound.game.Board
 import com.nicgames.rebound.game.Phase
-import kotlin.math.atan2
 import kotlin.math.min
+import java.util.Locale
 
 @Composable
-fun ReboundApp(model: AppModel, onHit: () -> Unit = {}) {
+fun ReboundApp(model: AppModel, onHit: () -> Unit = {}, onTestSound: () -> Unit = {}) {
     MaterialTheme(colorScheme = lightColorScheme(primary = Ink, onPrimary = Color.White, surface = Field, onSurface = Ink, background = Field)) {
         val screen = model.screen
         BackHandler(screen != Screen.HOME) { model.back() }
@@ -62,7 +62,7 @@ fun ReboundApp(model: AppModel, onHit: () -> Unit = {}) {
                     Screen.PAUSE -> PauseScreen(model)
                     Screen.RESULTS -> ResultsScreen(model)
                     Screen.HELP -> HelpScreen(model)
-                    Screen.SETTINGS -> SettingsScreen(model)
+                    Screen.SETTINGS -> SettingsScreen(model, onTestSound)
                     Screen.LICENSES -> LicensesScreen(model)
                 }
             }
@@ -96,7 +96,9 @@ private fun Action(text: String, onClick: () -> Unit, modifier: Modifier = Modif
 
 @Composable
 private fun TextAction(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, color: Color = Ink) {
-    TextButton(onClick, modifier.heightIn(min = 48.dp), shape = RectangleShape, colors = ButtonDefaults.textButtonColors(contentColor = color)) {
+    OutlinedButton(onClick, modifier.heightIn(min = 48.dp), shape = RectangleShape,
+        border = BorderStroke(1.dp, color), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = color)) {
         Text(text, fontFamily = Archivo, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
     }
 }
@@ -137,11 +139,11 @@ private fun HomeScreen(model: AppModel) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = if (compact) 14.dp else 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (model.canContinue) {
                     Action("Continue", model::resume, fill = Teal, textColor = Ink)
-                    TextAction("New game", { confirmNew = true }, Modifier.align(Alignment.CenterHorizontally))
+                    TextAction("New game", { confirmNew = true }, Modifier.fillMaxWidth())
                 } else Action("Play", model::newGame, fill = Coral, textColor = Ink)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    TextAction("How to play", model::help)
-                    TextAction("Settings", model::settings)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    TextAction("How to play", model::help, Modifier.weight(1f))
+                    TextAction("Settings", model::settings, Modifier.weight(1f))
                 }
             }
         }
@@ -174,36 +176,40 @@ private fun PlayScreen(model: AppModel, onHit: () -> Unit) {
         }
     }
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().background(Ink).padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Display(game.round.toString(), Modifier.testTag("round"), Color.White, if (game.round < 1000) 42 else 32)
-                Label("Round", Modifier.padding(bottom = 5.dp), Color.White, 14)
+        Row(Modifier.fillMaxWidth().background(Ink).padding(horizontal = 14.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Display(game.round.toString(), Modifier.testTag("round"), Color.White, if (game.round < 1000) 36 else 27)
+                Label("Round", color = Color.White, size = 12)
             }
-            OutlinedButton(model::pause, Modifier.heightIn(min = 48.dp), shape = RectangleShape,
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF657378)), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) {
-                Canvas(Modifier.size(14.dp)) {
-                    drawLine(Color.White, Offset(size.width * .28f, 1f), Offset(size.width * .28f, size.height - 1f), 2.dp.toPx())
-                    drawLine(Color.White, Offset(size.width * .72f, 1f), Offset(size.width * .72f, size.height - 1f), 2.dp.toPx())
-                }
-                Spacer(Modifier.width(5.dp))
-                Label("Pause", color = Color.White, size = 14, strong = true)
-            }
+            TextAction("Settings", model::settings, color = Color.White)
+            TextAction("Pause", model::pause, color = Color.White)
         }
         SpectrumEdge()
         Box(Modifier.weight(1f).fillMaxWidth().background(Field), contentAlignment = Alignment.Center) {
             GameBoard(model, revision, Modifier.fillMaxSize())
-            if (!model.helpSeen && phase == Phase.AIMING) Label("Drag to aim. Release to shoot.", Modifier.align(Alignment.BottomCenter).padding(bottom = 9.dp), size = 13)
+            if (!model.helpSeen && phase == Phase.AIMING) Label("Pull back to aim. Release to shoot.", Modifier.align(Alignment.BottomCenter).padding(bottom = 9.dp), size = 13)
         }
-        Row(Modifier.fillMaxWidth().background(Ink).padding(horizontal = 18.dp, vertical = 6.dp).heightIn(min = 58.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth().background(Ink).padding(horizontal = 14.dp, vertical = 6.dp).heightIn(min = 58.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 Canvas(Modifier.size(8.dp)) { drawCircle(Color.White) }
-                Label("${game.ballCount}", Modifier.testTag("ball-count"), Color.White, 23, strong = true)
-                Label(if (game.ballCount == 1) "ball" else "balls", color = Color.White, size = 14)
+                Label("${game.ballCount}", Modifier.testTag("ball-count"), Color.White, 21, strong = true)
+                Label(if (game.ballCount == 1) "ball" else "balls", color = Color.White, size = 12)
             }
             if (phase == Phase.FIRING) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (game.shotElapsed >= 4.0) TextAction("Collect", model::recall, color = Color.White)
-                    TextAction("Speed ${model.speed}×", model::changeSpeed, color = Teal)
+                if (game.shotElapsed >= 4.0) TextAction("Collect", model::recall, color = Color.White)
+                if (model.showSpeedUp) {
+                    OutlinedButton(model::speedUp,
+                        Modifier.heightIn(min = 48.dp).testTag("speed-up").semantics {
+                            selected = model.speedUpActive
+                            stateDescription = if (model.speedUpActive) "Maximum speed for this round" else "Use maximum speed until this round ends"
+                        },
+                        shape = RectangleShape, border = BorderStroke(1.dp, Teal),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = if (model.speedUpActive) Teal else Color.Transparent,
+                            contentColor = if (model.speedUpActive) Ink else Teal)) {
+                        Label("Speed up", color = if (model.speedUpActive) Ink else Teal, size = 14, strong = true)
+                    }
                 }
             }
         }
@@ -242,14 +248,14 @@ private fun GameBoard(model: AppModel, revision: Int, modifier: Modifier) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
             val scale = min(size.width / Board.WIDTH, size.height / Board.HEIGHT)
-            val left = (size.width - Board.WIDTH * scale) / 2.0
-            val top = (size.height - Board.HEIGHT * scale) / 2.0
             fun pointAim(p: Offset) {
-                val x = (p.x - left) / scale
-                val y = (p.y - top) / scale
-                model.aim(atan2(minOf(-12.0, y - Board.LAUNCH_Y), x - game.launchX))
+                val angle = PullBackAim.angle(
+                    (p.x - down.position.x) / scale,
+                    (p.y - down.position.y) / scale,
+                )
+                if (angle == null) model.cancelAim() else model.aim(angle)
             }
-            pointAim(down.position)
+            model.cancelAim()
             down.consume()
             var released = false
             try {
@@ -273,9 +279,11 @@ private fun GameBoard(model: AppModel, revision: Int, modifier: Modifier) {
         val s = min(size.width / Board.WIDTH.toFloat(), size.height / Board.HEIGHT.toFloat())
         translate((size.width - Board.WIDTH.toFloat() * s) / 2, (size.height - Board.HEIGHT.toFloat() * s) / 2) {
             scale(s, Offset.Zero) {
-                // A subtle side boundary makes the actual wall locations honest.
-                drawLine(Color(0xFFD3D8DA), Offset(12f, 8f), Offset(12f, 482f), 1f)
-                drawLine(Color(0xFFD3D8DA), Offset(348f, 8f), Offset(348f, 482f), 1f)
+                // All three visible boundaries match the actual physics surfaces.
+                val wallColor = Color(0xFF879297)
+                drawLine(wallColor, Offset(Board.LEFT.toFloat(), Board.TOP.toFloat()), Offset(Board.RIGHT.toFloat(), Board.TOP.toFloat()), 1.5f)
+                drawLine(wallColor, Offset(Board.LEFT.toFloat(), Board.TOP.toFloat()), Offset(Board.LEFT.toFloat(), Board.FLOOR.toFloat()), 1.5f)
+                drawLine(wallColor, Offset(Board.RIGHT.toFloat(), Board.TOP.toFloat()), Offset(Board.RIGHT.toFloat(), Board.FLOOR.toFloat()), 1.5f)
                 game.blocks.forEach { block ->
                     val x = block.x.toFloat(); val y = (block.y + rowShift).toFloat()
                     drawRect(blockColor(block.hits), Offset(x, y), Size(42f, 42f))
@@ -298,9 +306,9 @@ private fun GameBoard(model: AppModel, revision: Int, modifier: Modifier) {
                         val path = game.aimPath(angle)
                         if (path.size >= 2) {
                             val from = Offset(path[0].x.toFloat(), path[0].y.toFloat())
-                            val to = Offset(path[1].x.toFloat(), path[1].y.toFloat())
+                            val hintEnd = AimGuide.end(path[0], path[1])
+                            val to = Offset(hintEnd.x.toFloat(), hintEnd.y.toFloat())
                             drawLine(Color(0xFF647177), from, to, strokeWidth = 2.5f, cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(.1f, 10f)))
-                            drawCircle(Ink, 4.5f, to, style = Stroke(1f))
                         }
                     }
                     drawCircle(Ink, 5f, Offset(game.launchX.toFloat(), Board.LAUNCH_Y.toFloat()))
@@ -312,7 +320,7 @@ private fun GameBoard(model: AppModel, revision: Int, modifier: Modifier) {
                 }
                 val danger = game.blocks.any { it.row >= 8 }
                 drawLine(if (danger) Color(0xFFBB3026) else Color(0xFF879297), Offset(12f, 482f), Offset(348f, 482f), if (danger) 2.5f else 1.2f)
-                drawRect(Ink, Offset(game.launchX.toFloat() - 10, 490f), Size(20f, 3f))
+                drawRect(Ink, Offset(game.nextLaunchX.toFloat() - 10, 490f), Size(20f, 3f))
             }
         }
     }
@@ -330,9 +338,10 @@ private fun PauseScreen(model: AppModel) {
         SpectrumEdge()
         Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Action("Resume", model::resume, fill = Teal, textColor = Ink)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                TextAction("How to play", model::help)
-                TextAction("Home", model::home)
+            TextAction("Settings", model::settings, Modifier.fillMaxWidth())
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TextAction("How to play", model::help, Modifier.weight(1f))
+                TextAction("Home", model::home, Modifier.weight(1f))
             }
         }
     }
@@ -352,7 +361,7 @@ private fun ResultsScreen(model: AppModel) {
         SpectrumEdge()
         Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Action("Play again", model::newGame, fill = Coral, textColor = Ink)
-            TextAction("Home", model::home, Modifier.align(Alignment.CenterHorizontally))
+            TextAction("Home", model::home, Modifier.fillMaxWidth())
         }
     }
 }
@@ -361,7 +370,8 @@ private fun ResultsScreen(model: AppModel) {
 private fun PageHeader(title: String, onBack: () -> Unit) {
     Column {
         Row(Modifier.fillMaxWidth().background(Ink).padding(horizontal = 12.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onBack, Modifier.size(48.dp)) { Icon(Icons.AutoMirrored.Sharp.ArrowBack, "Back", tint = Color.White) }
+            TextAction("Back", onBack, color = Color.White)
+            Spacer(Modifier.width(14.dp))
             Display(title, color = Color.White, size = 28)
         }
         SpectrumEdge()
@@ -373,11 +383,13 @@ private fun HelpScreen(model: AppModel) {
     Column(Modifier.fillMaxSize()) {
         PageHeader("How to play", model::back)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-            HelpRule("Aim & release", "Drag anywhere on the board to aim. Lift your finger to send the balls.")
+            HelpRule("Pull back & release", "Touch anywhere on the board, then pull down to aim upward. Pull left to shoot right, or right to shoot left. Release to shoot. Tap or return to your starting point to cancel.")
             HelpRule("Break the blocks", "Each hit takes one off a block. At zero, it disappears. Colors change with the number.")
             HelpRule("Add more balls", "Hit a circle marked + to add a ball to your next shot.")
             HelpRule("Stay above the line", "The blocks move down after every shot. A block reaching the bottom ends the run.")
-            HelpRule("Skip the wait", "Speed makes a volley faster. Collect ends it early, keeping the hits and extra balls already earned.")
+            HelpRule("Set your pace", "Choose your normal speed in Settings. You can open Settings during play; the game waits while you change it.")
+            HelpRule("Skip the wait", "Speed up uses the maximum speed for this shot only. Collect ends it early, keeping the hits and extra balls already earned.")
+            HelpRule("Watch your next shot", "The marker below the board moves as soon as the first ball lands. That is where your next shot starts.")
         }
         Box(Modifier.padding(horizontal = 24.dp, vertical = 12.dp)) { Action("Got it", model::back) }
     }
@@ -389,22 +401,42 @@ private fun HelpRule(title: String, body: String) {
 }
 
 @Composable
-private fun SettingsScreen(model: AppModel) {
+private fun SettingsScreen(model: AppModel, onTestSound: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         PageHeader("Settings", model::back)
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(24.dp)) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Label("Game speed", size = 21, strong = true)
+                    Label(String.format(Locale.ROOT, "%.1f×", model.preferredSpeed), Modifier.testTag("speed-value"), size = 21, strong = true)
+                }
+                Slider(value = model.preferredSpeed.toFloat(), onValueChange = { model.updatePreferredSpeed(it.toDouble()) },
+                    onValueChangeFinished = model::finishSpeedChange,
+                    valueRange = AppModel.MIN_SPEED.toFloat()..AppModel.MAX_SPEED.toFloat(),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("speed-slider").semantics { contentDescription = "Game speed" },
+                    colors = SliderDefaults.colors(thumbColor = Ink, activeTrackColor = Ink, inactiveTrackColor = Color(0xFFC5CDD0)))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Label("1×", size = 13)
+                    Label("6×", size = 13)
+                }
+            }
             SettingRow("Sound", model.sound, model::toggleSound)
+            OutlinedButton(onTestSound, Modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = model.sound,
+                shape = RectangleShape, border = BorderStroke(1.dp, if (model.sound) Ink else Color(0xFF879297)),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Ink)) {
+                Text("Test sound", fontFamily = Archivo, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            }
             SettingRow("Vibration", model.haptics, model::toggleHaptics)
             SettingRow("Animations", model.motion, model::toggleMotion)
             Spacer(Modifier.height(22.dp))
-            TextAction("About & licenses", model::licenses)
+            TextAction("About & licenses", model::licenses, Modifier.fillMaxWidth())
         }
     }
 }
 
 @Composable
 private fun SettingRow(title: String, checked: Boolean, toggle: () -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 72.dp).clickable(onClickLabel = "Toggle $title", onClick = toggle).semantics(mergeDescendants = true) { stateDescription = if (checked) "On" else "Off" }, horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).border(1.dp, Ink).clickable(onClickLabel = "Toggle $title", onClick = toggle).padding(horizontal = 12.dp).semantics(mergeDescendants = true) { stateDescription = if (checked) "On" else "Off" }, horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Label(title, size = 21, strong = true)
         Box(Modifier.width(64.dp).height(38.dp).background(if (checked) Teal else Color(0xFFDDE1E3)).border(1.dp, Ink), contentAlignment = Alignment.Center) { Label(if (checked) "On" else "Off", strong = true) }
     }
@@ -418,7 +450,7 @@ private fun LicensesScreen(model: AppModel) {
         PageHeader("About", model::back)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Display("REBOUND", size = 32)
-            Label("Version 1.0.0")
+            Label("Version ${BuildConfig.VERSION_NAME}")
             Label("An offline ball-and-block game. No ads, accounts, tracking, or network access. Progress and settings stay on this device.")
             Label("Original game code and graphics. Not affiliated with Ballz or Ketchapp.")
             Label("Fonts: Archivo and Archivo Black, by the Archivo Project Authors. SIL Open Font License.", strong = true)

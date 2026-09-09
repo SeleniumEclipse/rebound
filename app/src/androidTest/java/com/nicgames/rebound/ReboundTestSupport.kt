@@ -25,6 +25,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import com.nicgames.rebound.game.Block
+import com.nicgames.rebound.game.Ball
 import com.nicgames.rebound.game.Board
 import com.nicgames.rebound.game.GameEngine
 import com.nicgames.rebound.game.GameSnapshot
@@ -49,7 +50,7 @@ import kotlin.math.min
 @Retention(AnnotationRetention.RUNTIME)
 annotation class LaunchWith(val value: ReboundFixture, val helpSeen: Boolean = true)
 
-enum class ReboundFixture { EMPTY, ROUND_42, MID_FLIGHT, BEFORE_LOSS }
+enum class ReboundFixture { EMPTY, ROUND_42, MID_FLIGHT, BEFORE_LOSS, FIRST_LANDING, NEXT_HIT }
 
 internal object ReboundFixtures {
     fun round42(): GameSnapshot = checked(GameEngine(4242L).snapshot().copy(
@@ -91,6 +92,15 @@ internal object ReboundFixtures {
             ReboundFixture.ROUND_42 -> round42()
             ReboundFixture.MID_FLIGHT -> midFlight()
             ReboundFixture.BEFORE_LOSS -> beforeLoss()
+            ReboundFixture.FIRST_LANDING -> checked(round42().copy(
+                phase = Phase.FIRING, ballCount = 5, blocks = emptyList(), pickups = emptyList(),
+                balls = listOf(Ball(80.0, 477.0, 0.0, 430.0), Ball(260.0, 200.0, 0.0, -430.0)),
+                pendingLaunches = 3, launchCountdown = .04, shotAngle = -Math.PI / 2,
+            ))
+            ReboundFixture.NEXT_HIT -> checked(round42().copy(
+                phase = Phase.FIRING, ballCount = 1, blocks = listOf(Block(1, 0, 0, 9)), pickups = emptyList(),
+                balls = listOf(Ball(41.0, 76.0, 0.0, -430.0)), shotAngle = -Math.PI / 2,
+            ))
         }
         // Only app-local preferences are changed. No emulator-wide audio/animation settings.
         return SavedGame(engine = snapshot, best = 73, sound = false, haptics = false)
@@ -182,7 +192,7 @@ abstract class ReboundUiTest {
     }
 
     protected fun headerBack() {
-        compose.onNodeWithContentDescription("Back").assertIsDisplayed().performClick()
+        compose.onNodeWithText("Back").assertIsDisplayed().performClick()
         frame()
     }
 

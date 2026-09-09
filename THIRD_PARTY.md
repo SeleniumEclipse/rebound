@@ -8,4 +8,4 @@
 - **Gradle wrapper** — Gradle, Inc. and contributors, Apache License 2.0.
 - **JUnit 4** (tests only) — Eclipse Public License 1.0.
 
-Original game graphics are drawn in code. No Ballz, Holedown, Mini Metro, or other game's artwork, sound files, or source code is included.
+Original game graphics are drawn in code. The block-hit WAV is synthesized by [tools/generate-hit-sound.cjs](tools/generate-hit-sound.cjs), without external samples. No Ballz, Holedown, Mini Metro, or other game's artwork, sound files, or source code is included.

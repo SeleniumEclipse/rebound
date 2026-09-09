@@ -26,12 +26,12 @@ class ReboundGameplayTest : ReboundUiTest() {
     fun realPointerDragAimsUntilReleaseThenFiresAndMovesBalls() {
         click("Continue")
         assertFalse(modelValue { it.helpSeen })
-        compose.onNodeWithText("Drag to aim. Release to shoot.").assertIsDisplayed()
+        compose.onNodeWithText("Pull back to aim. Release to shoot.").assertIsDisplayed()
         val before = snapshot()
         val board = compose.onNodeWithTag("game-board")
-        val start = boardPoint(before.launchX, Board.LAUNCH_Y - 18.0)
-        val end = boardPoint(84.0, 300.0)
-        val expectedAngle = atan2(300.0 - Board.LAUNCH_Y, 84.0 - before.launchX)
+        val start = boardPoint(180.0, 250.0)
+        val end = boardPoint(84.0, 400.0)
+        val expectedAngle = atan2(-150.0, 96.0)
 
         // Keep the same real pointer down across calls, proving that moving is not firing.
         board.performTouchInput {
@@ -53,7 +53,7 @@ class ReboundGameplayTest : ReboundUiTest() {
         assertEquals(expectedAngle, atan2(fired.balls.first().vy, fired.balls.first().vx), 0.0001)
         assertTrue("A successful pointer shot records that the tutorial was seen",
             targetContext.getSharedPreferences("rebound", 0).getBoolean("helpSeen", false))
-        compose.onNodeWithText("Drag to aim. Release to shoot.").assertDoesNotExist()
+        compose.onNodeWithText("Pull back to aim. Release to shoot.").assertDoesNotExist()
 
         advance(192L)
         val moving = snapshot()
@@ -72,8 +72,8 @@ class ReboundGameplayTest : ReboundUiTest() {
         click("Continue")
         val before = snapshot()
         val board = compose.onNodeWithTag("game-board")
-        val start = boardPoint(before.launchX, Board.LAUNCH_Y - 18.0)
-        val end = boardPoint(270.0, 250.0)
+        val start = boardPoint(180.0, 250.0)
+        val end = boardPoint(270.0, 400.0)
         board.performTouchInput { down(start); moveTo(end, delayMillis = 96L) }
         frame()
         assertTrue(modelValue { it.aiming })

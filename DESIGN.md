@@ -9,12 +9,16 @@ The user approved the **Clear multicolor** board and allowed bolder menus, heade
 - Coral `#F27C7C` below 10 hits; orange `#F5AD65` below 20; yellow `#E9D363` below 30; green `#9ACC8B` below 40; teal `#62C4B9` below 60; violet `#AB97D8` below 100; deep violet `#7354A2` above that.
 - Dark digits on the six light colors; white digits on deep violet. No random color assignment.
 - Hollow plus circles are extra-ball pickups, never targets. Balls and the aiming guide are dark.
-- The guide ends at the first radius-correct collision. No decorative curves or false wall markings.
+- Pull-back aiming uses displacement from the initial touch. Pull down to shoot up; a small dead zone prevents tap shots, and returning to the origin cancels the gesture.
+- The dotted guide is capped at one-third of the board height, or a closer radius-correct collision. No distant endpoint ring: it hints at direction instead of solving the shot.
+- Ceiling and side boundaries are drawn exactly at the collision surfaces. The next-shot marker moves on the first landing without moving the current volley's emitter.
 - A short impact ring is feedback, not an ambient effect. Animation can be disabled.
 
 ## Give the menus a stronger identity
 
 Archivo Black headings, dark score/controls bands, flat color-block trim, and original ball-path artwork. One large action per menu. Broad rectangular buttons, with real text labels. Best round stays on the home/result screens, not in the playfield.
+
+All secondary actions have visible outlines, including New game, navigation, in-game Settings, and footer controls. Settings contains the saved normal-speed slider (1–6×, tenths). The footer's Speed up is a highlighted one-volley override, not a way to edit the saved preference. Settings pauses play and returns to where it was opened.
 
 No gradient, glow, glass blur, cream/serif fallback, highlighted headline word, decorative technical labels, emoji icons, card-dashboard layout, fake statistics, or extra subtitles. Help and license documents can scroll; the game cannot.
 

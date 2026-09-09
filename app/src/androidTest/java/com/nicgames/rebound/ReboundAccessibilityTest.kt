@@ -44,13 +44,13 @@ class ReboundAccessibilityTest : ReboundUiTest() {
         }
 
         click("Settings")
-        assertTouchTarget(compose.onNodeWithContentDescription("Back"))
+        assertTouchTarget(compose.onNodeWithText("Back"))
         listOf("Sound", "Vibration", "Animations", "About & licenses").forEach {
             assertTouchTarget(compose.onNodeWithText(it))
         }
         headerBack()
         click("How to play")
-        assertTouchTarget(compose.onNodeWithContentDescription("Back"))
+        assertTouchTarget(compose.onNodeWithText("Back"))
         assertTouchTarget(compose.onNodeWithText("Got it"))
         click("Got it")
 
@@ -91,7 +91,7 @@ class ReboundAccessibilityTest : ReboundUiTest() {
         assertEquals(initialAngle, modelValue { it.angle }, 0.000001)
         performBoardAction("Shoot")
         assertEquals(Phase.FIRING, snapshot().phase)
-        assertTouchTarget(compose.onNodeWithText("Speed 1×"))
+        assertTouchTarget(compose.onNodeWithText("Speed up"))
         advance(160L)
         assertTrue(snapshot().shotElapsed > 0.0)
         board.assert(SemanticsMatcher.expectValue(

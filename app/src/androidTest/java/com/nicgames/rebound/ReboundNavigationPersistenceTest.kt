@@ -34,7 +34,7 @@ class ReboundNavigationPersistenceTest : ReboundUiTest() {
         assertScreen(Screen.PLAY)
         compose.onNodeWithTag("round").assertTextEquals("1")
         compose.onNodeWithTag("ball-count").assertTextEquals("1")
-        compose.onNodeWithText("Drag to aim. Release to shoot.").assertIsDisplayed()
+        compose.onNodeWithText("Pull back to aim. Release to shoot.").assertIsDisplayed()
         assertFalse(modelValue { it.helpSeen })
         val game = snapshot()
         assertEquals(Phase.AIMING, game.phase)
@@ -50,8 +50,8 @@ class ReboundNavigationPersistenceTest : ReboundUiTest() {
         val before = snapshot()
         click("How to play")
         assertScreen(Screen.HELP)
-        compose.onNodeWithText("Aim & release").assertIsDisplayed()
-        compose.onNodeWithText("Drag anywhere on the board to aim. Lift your finger to send the balls.").assertIsDisplayed()
+        compose.onNodeWithText("Pull back & release").assertIsDisplayed()
+        compose.onNodeWithText("Touch anywhere on the board, then pull down to aim upward. Pull left to shoot right, or right to shoot left. Release to shoot. Tap or return to your starting point to cancel.").assertIsDisplayed()
         click("Got it")
         assertScreen(Screen.HOME)
 
@@ -167,7 +167,7 @@ class ReboundNavigationPersistenceTest : ReboundUiTest() {
 
         click("About & licenses")
         assertScreen(Screen.LICENSES)
-        compose.onNodeWithText("Version 1.0.0").assertIsDisplayed()
+        compose.onNodeWithText("Version ${BuildConfig.VERSION_NAME}").assertIsDisplayed()
         back()
         assertScreen(Screen.SETTINGS)
         val stored = requireNotNull(GameStore(targetContext).load())

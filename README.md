@@ -6,12 +6,16 @@ A clean, colorful ball-and-block game for Android. Aim a stream of balls, wear d
 
 ## Play
 
-- Drag anywhere on the board to aim; release to shoot.
+- Touch anywhere on the board and **pull back** to aim in the opposite direction; release to shoot. Pull down-left to shoot up-right. Taps do not shoot; return to the touch's starting point to cancel.
+- The dotted guide only reaches about one-third of the board's height, leaving distant hit positions for you to judge.
 - Each hit removes one from a block. At zero it disappears.
 - Hit a **+ circle** to add a ball to the next volley.
 - Blocks descend once the volley finishes. A block reaching the bottom ends the run.
-- **Speed** cycles through normal, 3×, and 6×. **Collect** ends a long volley early, keeping damage and pickups already earned.
+- **Settings → Game speed** is a slider from 1× to 6×, adjustable in tenths and saved between games. Settings is available directly during play and from pause; gameplay waits while it is open.
+- **Speed up** temporarily uses 6× until the current volley ends, then restores your chosen speed. It is not shown when your preferred speed is already 6×. **Collect** ends a long volley early, keeping damage and pickups already earned.
+- The next-shot marker moves as soon as the first ball lands. Remaining balls in that volley still launch from the original position.
 - Pause whenever needed. Your run, best round, and settings are saved on the device, including an interrupted volley.
+- Block hits use a short original impact sound. In **Settings**, turn Sound on and use **Test sound**; the phone's volume buttons adjust media volume. The app never raises system volume automatically.
 
 No ads, accounts, tracking, or Internet connection. Requires **Android 8.0 or newer**. Portrait gameplay.
 
@@ -47,7 +51,7 @@ That file contains `storeFile`, `storePassword`, `keyAlias`, and `keyPassword`. 
 ## Implementation
 
 - Pure Kotlin, fixed-step simulation with continuous circle/rectangle collision detection and chronological shared-block impacts.
-- Radius-aware aiming, capped visual effects, sequential volleys up to 999 balls, and deterministic random rows.
+- Short radius-aware aiming hints, visible ceiling and walls, capped visual effects, sequential volleys up to 999 balls, and deterministic random rows.
 - Separate Compose interface, local versioned save snapshots, lifecycle pause, optional sound, vibration, and animation.
 - For low vision, controls are labeled and keyboard/TalkBack aiming actions are available. The moving visual board is **not claimed to be fully playable without sight**.
 

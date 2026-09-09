@@ -1,4 +1,31 @@
-# Rebound 1.0.0 validation
+# Rebound validation
+
+## Version 1.1.0 — 9 September 2026
+
+**98 JVM tests passed**, including all previous engine tests plus seven first-landing/queued-emitter tests, eight pull-back aiming tests, and four short-guide geometry tests.
+
+**29 Android tests passed** on the isolated ReboundTest Android 14 device (1080 × 2340, 440dpi). These include:
+
+- Real pull-back touch input and opposite shot direction; taps, cancelled gestures, and returning to the gesture origin do not fire.
+- Pixel checks prove the guide stops around one-third of the board height, the ceiling is drawn, and the next-shot marker moves on the first landing while other balls remain active.
+- Real slider dragging selects intermediate speeds, and the preference survives restart and new games.
+- Settings opens from play and pause, freezes the simulation, and returns to its origin; backgrounding while in Settings returns safely to pause.
+- Temporary maximum speed survives pause but ends with the volley or Collect; the saved preference is unchanged. The boost button is hidden when the preference is already maximum.
+- Existing 1.0.0 saves without new fields still load.
+- Visible New game outline, non-overlapping controls, labeled actions, minimum target sizes, and contrast.
+- Audio sample has nonzero PCM energy; SoundPool reports successful real playback on a physics hit and on Test sound. Sound off disables the test, and no system media-volume setting is changed.
+
+The 13 control/rendering tests also passed at **320 × 640dp** on the same isolated device. This is a second layout run, not 13 additional unique tests.
+
+**Signed-release smoke: seven checks passed**, including a real slider drag to 3.3×, returning from in-game Settings, an actual pull-back shot completing a round, pause, forced process restart with run/speed restoration, and no fatal runtime error. Release lint: **zero errors**.
+
+Final APK: **1,025,276 bytes**, SHA-256 **ec6050916baec3a340212375efac91e5bd72655a8a8a34936a944fadc21f292f**. Release certificate matches 1.0.0 for in-place upgrades. Package remains `com.nicgames.rebound`, versionCode 2, versionName 1.1.0.
+
+Audio limits: the test proves the bundled signal and Android playback path, **not audibility through the user's physical phone speaker**. The old sound was a 24ms system beep at a low gain; 1.1.0 uses an original 85ms preloaded impact sample. Test sound and media-volume routing make handset diagnosis possible. No music or wall-bounce sound is claimed. The emulator was started with host audio disabled.
+
+Test correction: the slider's accessibility rectangle extends outside its visible track. The first test began in that margin and did not drag the thumb. Both the corrected continuous gesture and an independent signed-APK input swipe now verify the actual slider; this was not fixed by bypassing the slider with model changes.
+
+## Version 1.0.0 — historical evidence
 
 Validated locally on 9 September 2026. Claims below distinguish simulated fixtures from actual release play.
 
