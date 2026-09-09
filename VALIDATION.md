@@ -37,6 +37,8 @@ The non-debug `com.nicgames.rebound` release was installed on the emulator and e
 
 APK package inspection confirms version 1.0.0, minimum API 26, target API 35, no debuggable flag, and **no Internet permission**. Signature verification uses the Android SDK's APK verifier. The only requested platform permission is vibration; AndroidX also declares its package-scoped non-exported-receiver signature permission.
 
+Final downloadable APK: **1,001,196 bytes**, SHA-256 **63572ac2a2b6c2cdcad1f3464feca1048fc67671ee9f6c61c4a9c9d1a8b6156d**. All six black-box checks passed again on a separate ReboundTest Android 14/API 34 emulator. A prior check was interrupted by another project's test taking the foreground on a shared emulator; the smoke helper now explicitly detects this condition. Independent first-boot Android services also delayed one attempt; the completed run passed without changing gameplay code.
+
 Screenshots under [screenshots](screenshots) are actual Android renders. The home/paused/result/all-color board examples use deterministic test fixtures; release-prefixed captures come from black-box release play. Images were inspected for clipping, hierarchy, and readable numbers.
 
 ## Fixed during review
