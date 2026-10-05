@@ -17,19 +17,35 @@ class GameEngineTest {
         assertEquals(161.0, block.y, 0.0)
     }
 
-    @Test fun startingBoardIsApproachableAndHasGapsAndOnePickup() {
+    @Test fun startingBoardHasOneBallAndNoPrematurePickup() {
         repeat(100) { seed ->
             val engine = GameEngine(seed.toLong())
             assertEquals(Phase.AIMING, engine.phase)
             assertEquals(1, engine.round)
             assertEquals(1, engine.ballCount)
             assertEquals(180.0, engine.launchX, 0.0)
-            assertTrue(engine.blocks.size in 2..4)
-            assertEquals(1, engine.pickups.size)
-            assertTrue(engine.blocks.all { it.hits == 1 && it.row == 0 })
+            assertTrue(engine.blocks.size in 1..6)
+            assertTrue(engine.pickups.isEmpty())
+            assertTrue(engine.blocks.all { it.hits in 1..2 && it.row == 0 })
             val occupied = engine.blocks.map { it.column } + engine.pickups.map { it.column }
             assertEquals(occupied.size, occupied.toSet().size)
-            assertTrue(Board.COLUMNS - occupied.size >= 2)
+            assertTrue(Board.COLUMNS - occupied.size >= 1)
+        }
+    }
+
+    @Test fun eachLaterRowAddsOneCollectibleButNeverAutomaticallyAwardsABall() {
+        repeat(50) { seed ->
+            val engine = GameEngine(seed.toLong())
+            repeat(6) { turn ->
+                assertTrue(engine.fire(-1.0))
+                assertTrue(engine.recall())
+                steps(engine, 27)
+                assertEquals(turn + 2, engine.round)
+                assertEquals(1, engine.ballCount)
+                assertEquals(1, engine.pickups.count { it.row == 0 })
+                assertTrue(engine.blocks.none { it.row == 0 && it.column == engine.pickups.single { pickup -> pickup.row == 0 }.column })
+                assertNotNull(GameEngine.restore(engine.snapshot()))
+            }
         }
     }
 
@@ -444,7 +460,7 @@ class GameEngineTest {
         assertEquals(8, engine.blocks.single { it.id == 1L }.row)
         assertEquals(2, engine.round)
         assertEquals(0.0, engine.advanceProgress, 0.0)
-        assertTrue(engine.blocks.count { it.row == 0 } in 2..4)
+        assertTrue(engine.blocks.count { it.row == 0 } in 1..6)
         val after = engine.snapshot()
         engine.tick(0.25)
         assertEquals(after, engine.snapshot())
@@ -503,10 +519,57 @@ class GameEngineTest {
             engine.recall()
             steps(engine, 27)
             assertEquals(21, engine.round)
-            assertTrue(engine.blocks.all { it.hits in 15..55 })
-            if (engine.blocks.any { it.hits > 28 }) sawDouble = true
+            assertTrue(engine.blocks.all { it.hits == 21 || it.hits == 42 })
+            if (engine.blocks.any { it.hits == 42 }) sawDouble = true
         }
         assertTrue("Some seeded rows should include the occasional strong block", sawDouble)
+    }
+
+    @Test fun sampledRowsMatchObservedDensityStrengthAndOneBallPerTurn() {
+        val samples = 5000
+        val counts = IntArray(Board.COLUMNS)
+        var totalBlocks = 0
+        var doubledBlocks = 0
+        var totalHitsRequired = 0L
+        repeat(samples) { seed ->
+            val engine = restored(emptySnapshot(seed.toLong()).copy(round = 119))
+            assertTrue(engine.fire(-1.0))
+            assertTrue(engine.recall())
+            steps(engine, 27)
+            assertEquals(120, engine.round)
+            assertEquals(1, engine.pickups.size)
+            assertEquals(0, engine.pickups.single().row)
+            assertTrue(engine.blocks.none { it.column == engine.pickups.single().column })
+            assertTrue(engine.blocks.all { it.hits == 120 || it.hits == 240 })
+            assertNotNull(GameEngine.restore(engine.snapshot()))
+            counts[engine.blocks.size]++
+            totalBlocks += engine.blocks.size
+            doubledBlocks += engine.blocks.count { it.hits == 240 }
+            totalHitsRequired += engine.blocks.sumOf { it.hits.toLong() }
+        }
+        val average = totalBlocks.toDouble() / samples
+        val doubledFraction = doubledBlocks.toDouble() / totalBlocks
+        val denseFraction = (counts[5] + counts[6]).toDouble() / samples
+        val damagePerRound = totalHitsRequired.toDouble() / samples / 120
+        assertEquals(0, counts[0])
+        assertTrue((1..6).all { counts[it] > 0 })
+        assertTrue("Mean blocks per row: $average", average in 3.20..3.30)
+        assertTrue("Double-strength fraction: $doubledFraction", doubledFraction in .145.. .19)
+        assertTrue("Dense-row fraction: $denseFraction", denseFraction in .12.. .18)
+        assertTrue("Incoming damage relative to round: $damagePerRound", damagePerRound in 3.7..3.9)
+        println("Balance: rows=$samples counts=${counts.contentToString()} mean=$average doubleFraction=$doubledFraction damagePerRound=$damagePerRound")
+    }
+
+    @Test fun extremeRoundsCannotOverflowFreshBlockStrength() {
+        repeat(50) { seed ->
+            val engine = restored(emptySnapshot(seed.toLong()).copy(round = Int.MAX_VALUE))
+            assertTrue(engine.fire(-1.0))
+            assertTrue(engine.recall())
+            steps(engine, 27)
+            assertEquals(Int.MAX_VALUE, engine.round)
+            assertTrue(engine.blocks.all { it.hits == Int.MAX_VALUE })
+            assertNotNull(GameEngine.restore(engine.snapshot()))
+        }
     }
 
     @Test fun aimStopsAtFirstRadiusAwareBlockHitAndNeverMutatesState() {

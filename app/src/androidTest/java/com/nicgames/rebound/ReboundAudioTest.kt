@@ -7,6 +7,7 @@ import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 import com.nicgames.rebound.audio.PopSample
+import com.nicgames.rebound.game.Phase
 import java.security.MessageDigest
 
 @RunWith(AndroidJUnit4::class)
@@ -136,5 +137,32 @@ class ReboundAudioTest : ReboundUiTest() {
                 """{"isolatedPops":8,"writtenFrames":${audio.writtenFrames},"playedFrames":${audio.playedFrames},"nonzeroFrames":${audio.audibleFrames},"writeFailures":${audio.writeFailures}}""",
             )
         } finally { compose.runOnIdle { audio.release() } }
+    }
+
+    @Test
+    @LaunchWith(ReboundFixture.DENSE_VOLLEY)
+    fun maximumSpeedCrowdedVolleyReachesAndroidAudioWithoutWriteFailures() {
+        waitForAudio()
+        modelValue {
+            if (!it.sound) it.toggleSound()
+            it.updatePreferredSpeed(6.0)
+        }
+        val requested = compose.activity.soundPlaybackCount
+        click("Continue")
+        var frames = 0
+        while (snapshot().phase == Phase.FIRING || snapshot().phase == Phase.ADVANCING) {
+            assertTrue("The maximum-speed volley must complete", frames++ < 100)
+            advance(96)
+        }
+        val hits = snapshot().totalHits
+        assertTrue("Exercise thousands of actual impacts", hits > 1000)
+        assertEquals(hits.toInt(), compose.activity.soundPlaybackCount - requested)
+        assertEquals(Phase.AIMING, snapshot().phase)
+        compose.waitUntil(5000) { compose.activity.soundPlayedFrames > 5000 }
+        assertTrue(compose.activity.soundAudibleFrames > 2000)
+        assertEquals(0, compose.activity.soundWriteFailures)
+        java.io.File(targetContext.filesDir, "audio-dense-evidence.json").writeText(
+            """{"speed":6,"hits":$hits,"writtenFrames":${compose.activity.soundWrittenFrames},"playedFrames":${compose.activity.soundPlayedFrames},"nonzeroFrames":${compose.activity.soundAudibleFrames},"writeFailures":${compose.activity.soundWriteFailures}}""",
+        )
     }
 }

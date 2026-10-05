@@ -6,7 +6,6 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.min
-import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /** Offline, single-threaded simulation. All time values are simulated seconds. */
@@ -396,12 +395,15 @@ class GameEngine private constructor(seed: Long, initialize: Boolean) {
             columns[i] = columns[j]
             columns[j] = swap
         }
-        val count = 2 + random.nextInt(3)
-        mutablePickups.add(Pickup(nextId++, columns[0], 0))
+        var count = 0
+        repeat(Board.COLUMNS - 1) {
+            if (random.nextInt(100) < 54) count++
+        }
+        count = count.coerceAtLeast(1)
+        if (round > 1) mutablePickups.add(Pickup(nextId++, columns[0], 0))
         for (i in 1..count) {
-            var strength = if (round == 1) 1.0 else round * (0.7 + random.nextDouble() * 0.6)
-            if (round >= 4 && random.nextInt(8) == 0) strength *= 2.0
-            val hits = strength.coerceIn(1.0, Int.MAX_VALUE.toDouble()).roundToInt()
+            val strength = round.toLong() * if (random.nextInt(6) == 0) 2 else 1
+            val hits = strength.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
             mutableBlocks.add(Block(nextId++, columns[i], 0, hits))
         }
     }
@@ -563,10 +565,10 @@ class GameEngine private constructor(seed: Long, initialize: Boolean) {
                 if (pickup.column !in 0 until Board.COLUMNS || pickup.row !in 0..9) return false
                 if (!occupied.add(pickup.row * Board.COLUMNS + pickup.column)) return false
             }
-            // A full row cannot arise from the generator and closes off every playable lane.
-            if (s.blocks.groupingBy { it.row }.eachCount().values.any { it > 4 }) return false
+            val maxBlocksInRow = if (s.version < 3) 4 else Board.COLUMNS - 1
+            if (s.blocks.groupingBy { it.row }.eachCount().values.any { it > maxBlocksInRow }) return false
             if (s.pickups.groupingBy { it.row }.eachCount().values.any { it > 1 }) return false
-            if (occupied.groupingBy { it / Board.COLUMNS }.eachCount().values.any { it > 5 }) return false
+            if (occupied.groupingBy { it / Board.COLUMNS }.eachCount().values.any { it > maxBlocksInRow + 1 }) return false
             if (s.phase == Phase.GAME_OVER && s.blocks.none { it.row == 9 }) return false
             for (ball in s.balls) {
                 if (!ball.x.isFinite() || !ball.y.isFinite() || !ball.vx.isFinite() || !ball.vy.isFinite()) return false
@@ -625,5 +627,4 @@ private class SeededRandom(var state: Long) {
     }
 
     fun nextInt(bound: Int): Int = ((nextLong() ushr 1) % bound).toInt()
-    fun nextDouble(): Double = (nextLong() ushr 11).toDouble() / 9007199254740992.0
 }

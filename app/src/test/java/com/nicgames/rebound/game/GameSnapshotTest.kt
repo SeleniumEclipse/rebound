@@ -131,7 +131,7 @@ class GameSnapshotTest {
         }
         assertEquals(8, resumed.blocks.single { it.id == 1L }.row)
         assertEquals(2, resumed.round)
-        assertTrue(resumed.blocks.count { it.row == 0 } in 2..4)
+        assertTrue(resumed.blocks.count { it.row == 0 } in 1..6)
     }
 
     @Test fun saveImmediatelyBeforeLossDoesNotLoseTwiceOnRestore() {
@@ -223,6 +223,15 @@ class GameSnapshotTest {
         for ((label, snapshot) in invalid) assertNull(label, GameEngine.restore(snapshot))
     }
 
+    @Test fun sixBlocksAndABallPickupCanBeSavedAndRestored() {
+        val before = emptySnapshot().copy(
+            blocks = List(6) { Block(it + 1L, it, 0, 12) },
+            pickups = listOf(Pickup(7, 6, 0)),
+        )
+        val restored = requireNotNull(GameEngine.restore(before))
+        assertEquals(before, restored.snapshot())
+    }
+
     @Test fun invalidBoardGeometryIdsAndRowOccupancyAreRejected() {
         val base = emptySnapshot()
         val invalid = listOf(
@@ -235,7 +244,7 @@ class GameSnapshotTest {
             "bottom block in active game" to base.copy(blocks = listOf(Block(1, 0, 9, 1))),
             "dead block" to base.copy(blocks = listOf(Block(1, 0, 0, 0))),
             "negative block strength" to base.copy(blocks = listOf(Block(1, 0, 0, -1))),
-            "more than four blocks in row" to base.copy(blocks = List(5) { Block(it + 1L, it, 0, 1) }),
+            "seven blocks seal every lane" to base.copy(blocks = List(7) { Block(it + 1L, it, 0, 1) }),
             "oversized board" to base.copy(blocks = List(71) { Block(it + 1L, 0, 0, 1) }),
             "pickup in block cell" to base.copy(blocks = listOf(Block(1, 0, 0, 1)), pickups = listOf(Pickup(2, 0, 0))),
             "pickup with shared ID" to base.copy(blocks = listOf(Block(1, 0, 0, 1)), pickups = listOf(Pickup(1, 1, 0))),

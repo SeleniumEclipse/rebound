@@ -1,5 +1,37 @@
 # Rebound validation
 
+## Version 1.4.0 - 5 October 2026
+
+**149 JVM tests passed**, **37 Android tests passed**, and **seven signed-release smoke checks passed**, all with zero failures in the final runs. Release lint has zero errors; existing dependency/platform warnings remain. The final signed APK installed directly over version 1.3.0 on the isolated ReboundTest Android 14 emulator.
+
+### Original-game difficulty evidence
+
+Inspected original Ballz gameplay, not clone source code: [Richard's Corner, December 2017](https://www.youtube.com/watch?v=SziYPhcseTU). The 47 readable fresh-row observations are recorded with audited timestamps in [design/ballz-observations.csv](design/ballz-observations.csv). They contain 152 blocks, including 24 doubles: mean 3.234 blocks per row, 15.8% double strength, and eight rows with five or six blocks. Full opening frames at 2s and 6s confirm one initial ball, no opening pickup, then a pickup on round two.
+
+The new generator approximates those observations rather than claiming exact proprietary probabilities. It allows one to six blocks, uses round/double-round HP, and offers one collectible per later row. A 5,000-seed production-generator test measured mean **3.2568** blocks, **16.2245%** doubles, **14.92%** five/six-block rows, and incoming damage **3.7852 times the round number**. Also tested maximum-round overflow, no automatic ball award, six-block save restoration, all legacy migrations, and many dense long volleys. Existing saved blocks and earned balls are not rewritten.
+
+### High-speed audio evidence
+
+The old mixer combined up to 96 copies, multiplied gain by collision count, and applied a nonlinear limiter. A focused burst-waveform regression failed before the fix. The replacement uses fixed-level, linear, complete pops, at most two overlapping voices and one coalesced pending onset, paced by audio samples instead of game time. The original sound asset and pitch are unchanged.
+
+All 51 selectable speeds (1.0-6.0 in tenths) pass bounded-feedback and drain checks. A deterministic dense 250-ball fixture generated exactly **3,760 real block hits** at each tested speed. The 6x schedule reached 62 impacts in one display frame. Rendering the actual mixer against these traces produces the WAV and JSON evidence under ignored `build/audio-audit`.
+
+| Speed | Previous RMS | Current RMS | Current Peak | Audible Pop Onsets |
+| --- | --- | --- | --- | --- |
+| 1x | 0.17065 | 0.07560 | 0.32498 | 582 |
+| 3.5x | 0.25308 | 0.07584 | 0.32498 | 169 |
+| 6x | 0.28603 | 0.07562 | 0.32498 | 99 |
+
+RMS is average waveform strength, not a subjective loudness score. The old/new comparison uses the same hit schedules and the old mixing formula. New output is linear, so there is no limiter waveshaping. Fewer real-time pops at faster speed are deliberate grouping, not lost gameplay damage. Tests also prove chunk-size independence, complete tails, fixed batch level, cancellation/reuse, full-scale input headroom, and bounded termination.
+
+The Android 6x fixture verifies that all 3,760 collision requests reach audio, nonzero PCM is written, the playback head advances, and the volley finishes without write failures. Eight isolated pops also fully drain individually with zero write failures. Existing mute, system-volume, and lifecycle checks pass. Host audio was disabled: these checks do **not** certify perceived sound quality on the user's physical phone or Bluetooth route.
+
+### Signed release
+
+The exact release APK passed real touch aiming, a 3.2x slider drag, round completion, pause, process termination, restored run/preference, and the Android runtime-error check. The corrected opening-board instrumentation assertion now accepts the original's one- or two-hit initial blocks and requires no opening pickup; its earlier all-one-hit assumption was obsolete.
+
+APK **1,024,448 bytes**, SHA-256 **8e1dcd51a319161a829833b95aa67d3ef4a73f5c979ac57d2cc8cf8a044f0a22**. Package unchanged, versionCode 5, versionName 1.4.0. APK Signature Scheme v2 verified; the existing certificate permits install-over upgrades. The private signing configuration was relocated to E: and was used without copying secrets into the repository.
+
 ## Version 1.3.0 — 9 September 2026
 
 **142 JVM tests passed** and **36 Android tests passed**, zero failures. This includes the earlier engine/control suite, 14 ceiling/migration regression methods, ten PCM mixer tests, and real Android audio-write/playback checks. Release lint and editor diagnostics report **zero errors**.

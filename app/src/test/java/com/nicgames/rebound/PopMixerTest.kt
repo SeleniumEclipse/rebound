@@ -2,17 +2,38 @@ package com.nicgames.rebound
 
 import com.nicgames.rebound.audio.PopMixer
 import com.nicgames.rebound.audio.PopSample
+import com.nicgames.rebound.game.Ball
+import com.nicgames.rebound.game.Block
+import com.nicgames.rebound.game.Board
+import com.nicgames.rebound.game.GameEngine
+import com.nicgames.rebound.game.Phase
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.math.sqrt
-import kotlin.math.tanh
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.*
 import org.junit.Test
 
 /** Pure JVM PCM checks; these do not test device playback or perceived loudness. */
 class PopMixerTest {
+    @Test fun collisionBatchSizeDoesNotAmplifyOrDistortThePop() {
+        val sample = bundledPop()
+        val single = PopMixer(sample).apply { add() }
+        val crowded = PopMixer(sample).apply { add(10_000) }
+        val expected = ShortArray(sample.size + SAMPLE_RATE / 10)
+        val actual = ShortArray(expected.size)
+        single.render(expected)
+        crowded.render(actual)
+        assertEquals(10_000L, crowded.acceptedHits)
+        assertArrayEquals("Collision density must not multiply sample gain or flatten its waveform", expected, actual)
+    }
+
     @Test fun bundledWavIsCanonicalWithQuickOnsetAndControlledPeak() {
         val bytes = File("src/main/res/raw/ui_pop.wav").readBytes()
         val sample = PopSample.decode(bytes)
@@ -54,7 +75,7 @@ class PopMixerTest {
 
         assertEquals(6, mixer.render(output))
         assertTrue(output.take(5).all { it > 0 })
-        assertEquals(limitedPcm(-8192 / PCM_SCALE * 0.65), output[5])
+        assertEquals(linearPcm(-8192 / PCM_SCALE * 0.5), output[5])
         assertTrue("Unused part of reused buffer must be zero", output.drop(6).all { it == 0.toShort() })
         assertFalse(mixer.active)
 
@@ -65,13 +86,13 @@ class PopMixerTest {
     }
 
     @Test fun secondHitOverlapsWithoutRestartingOrStealingTheFirstTail() {
-        val sample = ShortArray(256) { 4096 }
+        val sample = ShortArray(100) { 4096 }
         val gap = 64
         val solo = ShortArray(sample.size)
-        val reference = PopMixer(sample).apply { add() }
+        val reference = PopMixer(sample, sampleRate = 1000).apply { add() }
         assertEquals(solo.size, reference.render(solo))
 
-        val mixer = PopMixer(sample).apply { add() }
+        val mixer = PopMixer(sample, sampleRate = 1000).apply { add() }
         val lead = ShortArray(gap)
         assertEquals(gap, mixer.render(lead))
         assertArrayEquals(solo.copyOfRange(0, gap), lead)
@@ -93,33 +114,23 @@ class PopMixerTest {
         assertEquals(2L, mixer.acceptedHits)
     }
 
-    @Test fun sameFrameHitsKeepTheirCountAndHaveBoundedWeightedOnsets() {
-        // One-frame impulses expose each onset directly in the rendered PCM.
+    @Test fun sameFrameHitsKeepTheirCountAndShareOneFixedLevelOnset() {
         for (hits in intArrayOf(1, 3, 16, 37)) {
             val sample = shortArrayOf(8192)
             val mixer = PopMixer(sample)
             mixer.add(hits)
             assertEquals(hits.toLong(), mixer.acceptedHits)
-            val output = ShortArray(sample.size + MAX_STAGGER_FRAMES + 16)
+            val output = ShortArray(sample.size + ONSET_INTERVAL_FRAMES + 16)
             val rendered = mixer.render(output)
             val onsets = output.indices.filter { output[it] != 0.toShort() }
-            val groups = minOf(hits, 16)
-
-            assertEquals("Wrong number of onsets for $hits hits", groups, onsets.size)
-            for (group in 0 until groups) {
-                val onset = group * SAMPLE_RATE / 500
-                val representedHits = hits / groups + if (group < hits % groups) 1 else 0
-                assertEquals("Onset $group for $hits hits", onset, onsets[group])
-                assertEquals("Grouped hits must affect PCM, not just the counter",
-                    limitedPcm(8192 / PCM_SCALE * 0.65 * sqrt(representedHits.toDouble())), output[onset])
-            }
-            assertTrue("No onset may create a long backlog", onsets.last() < MAX_STAGGER_FRAMES + sample.size)
-            assertEquals(onsets.last() + sample.size, rendered)
+            assertEquals(listOf(0), onsets)
+            assertEquals(linearPcm(8192 / PCM_SCALE * 0.5), output[0])
+            assertEquals(1L, mixer.emittedPops)
+            assertEquals(sample.size, rendered)
             assertTrue(output.drop(rendered).all { it == 0.toShort() })
             assertFalse(mixer.active)
         }
 
-        // Only 32 onset groups are queued: verify Long counting without a huge render loop.
         val counter = PopMixer(shortArrayOf(8192))
         counter.add(Int.MAX_VALUE)
         counter.add(Int.MAX_VALUE)
@@ -150,21 +161,18 @@ class PopMixerTest {
         assertFalse(mixer.active)
     }
 
-    @Test fun tenThousandHitsInOneBatchKeepHeadroomWithoutHardClipping() {
+    @Test fun fullScaleAssetAndTenThousandHitsRetainLinearHeadroom() {
         val sample = ShortArray(256) { if (it < 128) Short.MAX_VALUE else Short.MIN_VALUE }
         val mixer = PopMixer(sample)
-        mixer.add(10_000) // One batch, at most 16 onset groups, not 10,000 individual voices.
-        val output = ShortArray(sample.size + MAX_STAGGER_FRAMES + 32)
+        mixer.add(10_000)
+        val output = ShortArray(sample.size + ONSET_INTERVAL_FRAMES + 32)
         val rendered = mixer.render(output)
 
         assertEquals(10_000L, mixer.acceptedHits)
-        assertEquals(sample.size + MAX_STAGGER_FRAMES, rendered)
+        assertEquals(sample.size, rendered)
         assertTrue(output.any { it > 0 })
         assertTrue(output.any { it < 0 })
-        assertTrue("Stress signal must actually exercise the limiter",
-            output.maxOf { abs(it.toInt()) } / PCM_SCALE > 0.75)
-        assertTrue("Every PCM frame must retain headroom",
-            output.all { abs(it.toInt()) / PCM_SCALE < 0.83 })
+        assertEquals(0.325, output.maxOf { abs(it.toInt()) } / PCM_SCALE, 0.0001)
         assertTrue("No frame may hit either integer clipping rail",
             output.none { it == Short.MAX_VALUE || it == Short.MIN_VALUE })
         assertTrue(output.drop(rendered).all { it == 0.toShort() })
@@ -180,7 +188,7 @@ class PopMixerTest {
             mixer.add(3, preview = true)
             val middle = renderChunks(mixer, 509, chunks)
             mixer.add(9)
-            val tail = renderChunks(mixer, sample.size + MAX_STAGGER_FRAMES + 47, chunks)
+            val tail = renderChunks(mixer, sample.size + ONSET_INTERVAL_FRAMES + 47, chunks)
             assertEquals(16L, mixer.acceptedHits)
             assertFalse("All scheduled voices must finish", mixer.active)
             return first + middle + tail
@@ -196,15 +204,15 @@ class PopMixerTest {
     @Test fun clearSilencesBothPlayingAndPendingVoicesAndAllowsReuse() {
         val sample = bundledPop()
         val mixer = PopMixer(sample).apply { add(4) }
-        // The fourth voice is still pending at frame 257; the others have started.
         assertEquals(257, mixer.render(ShortArray(257)))
+        mixer.add(3)
         assertTrue(mixer.active)
         mixer.clear()
-        val output = ShortArray(sample.size + MAX_STAGGER_FRAMES + 16) { 12345 }
+        val output = ShortArray(sample.size + ONSET_INTERVAL_FRAMES + 16) { 12345 }
         assertFalse(mixer.active)
         assertEquals(0, mixer.render(output))
         assertTrue(output.all { it == 0.toShort() })
-        assertEquals(4L, mixer.acceptedHits)
+        assertEquals(7L, mixer.acceptedHits)
 
         mixer.add()
         val expected = ShortArray(output.size)
@@ -212,12 +220,11 @@ class PopMixerTest {
         assertEquals(sample.size, reference.render(expected))
         assertEquals(sample.size, mixer.render(output))
         assertArrayEquals(expected, output)
-        assertEquals(5L, mixer.acceptedHits)
+        assertEquals(8L, mixer.acceptedHits)
         assertFalse(mixer.active)
     }
 
-    @Test fun repeatedBurstsTerminateWithinOneSamplePlusTheStaggerWindow() {
-        // A short 1 kHz fixture exercises the 96-voice capacity without costly long samples.
+    @Test fun repeatedBurstsTerminateWithinOneSamplePlusOneOnsetInterval() {
         val sample = ShortArray(64) { 4096 }
         val mixer = PopMixer(sample, sampleRate = 1000)
         val step = ShortArray(1)
@@ -228,7 +235,7 @@ class PopMixerTest {
             assertTrue(step[0] > 0)
             assertTrue(mixer.active)
         }
-        val bound = sample.size + 30 // At 1 kHz the final stagger is 30 frames.
+        val bound = sample.size + 60
         val tail = ShortArray(bound + 16) { 12345 }
         val rendered = mixer.render(tail)
         assertTrue("Burst drain took $rendered frames, bound is $bound", rendered in 1..bound)
@@ -244,26 +251,137 @@ class PopMixerTest {
         val sample = bundledPop()
         val hits = 8
         val gap = SAMPLE_RATE * 8 / 1000
-        val output = ShortArray((hits - 1) * gap + sample.size)
+        val output = ShortArray((hits - 1) * gap + sample.size + ONSET_INTERVAL_FRAMES)
         val expectedSum = DoubleArray(output.size)
         val mixer = PopMixer(sample)
 
         repeat(hits) { hit ->
             mixer.add()
-            val chunk = ShortArray(if (hit == hits - 1) sample.size else gap)
-            assertEquals(chunk.size, mixer.render(chunk))
+            val chunk = ShortArray(if (hit == hits - 1) sample.size + ONSET_INTERVAL_FRAMES else gap)
+            mixer.render(chunk)
             chunk.copyInto(output, hit * gap)
-            // Independent offline sum of the decoded asset at the exact hit times.
-            for (index in sample.indices) expectedSum[hit * gap + index] += sample[index] / PCM_SCALE * 0.65
         }
-        val expected = ShortArray(output.size) { limitedPcm(expectedSum[it]) }
-        assertArrayEquals("Repeated hits must mix the actual asset without dropping tails", expected, output)
+        for (onset in intArrayOf(0, ONSET_INTERVAL_FRAMES)) {
+            for (index in sample.indices) expectedSum[onset + index] += sample[index] / PCM_SCALE * 0.5
+        }
+        val expected = ShortArray(output.size) { linearPcm(expectedSum[it]) }
+        assertArrayEquals("Dense feedback must be a linear sum of complete, unaltered pops", expected, output)
         val rms = sqrt(energy(output) / output.size)
         assertTrue("Normalized PCM RMS $rms is too quiet or too dense", rms in 0.02..0.5)
         assertTrue(output.any { it > 0 })
         assertTrue(output.any { it < 0 })
         assertEquals(hits.toLong(), mixer.acceptedHits)
+        assertEquals(2L, mixer.emittedPops)
         assertFalse(mixer.active)
+    }
+
+    @Test fun allSelectableSpeedsHaveBoundedFeedbackAndNoAudioBacklog() {
+        val sample = bundledPop()
+        val framesPerDisplayFrame = SAMPLE_RATE / 60
+        for (speedTenths in 10..60) {
+            val mixer = PopMixer(sample)
+            var hits = 0
+            var peak = 0
+            repeat(120) { displayFrame ->
+                val totalHits = (displayFrame + 1) * 2 * speedTenths / 10
+                mixer.add(totalHits - hits)
+                hits = totalHits
+                val output = ShortArray(framesPerDisplayFrame)
+                mixer.render(output)
+                peak = maxOf(peak, output.maxOf { abs(it.toInt()) })
+            }
+            val tail = ShortArray(sample.size + ONSET_INTERVAL_FRAMES)
+            mixer.render(tail)
+            assertFalse("Audio backlog at ${speedTenths / 10.0}x", mixer.active)
+            assertEquals(hits.toLong(), mixer.acceptedHits)
+            assertTrue("Feedback must remain audible but bounded", mixer.emittedPops in 25L..35L)
+            assertTrue("Density must not drive saturation", peak / PCM_SCALE in 0.1..0.65)
+            assertEquals(0, mixer.render(tail))
+            assertTrue(tail.all { it == 0.toShort() })
+        }
+    }
+
+    @Test fun densePhysicsVolleysKeepLinearAudioAtNormalFractionalAndMaximumSpeed() {
+        val sample = bundledPop()
+        val initial = GameEngine(6401).snapshot().copy(
+            phase = Phase.FIRING, round = 300, ballCount = 250, nextId = 1000,
+            pickups = emptyList(),
+            blocks = listOf(0, 7).flatMap { row ->
+                (0 until Board.COLUMNS).filter { it != 3 }.map { column ->
+                    Block(1L + row * Board.COLUMNS + column, column, row, 600)
+                }
+            },
+            balls = List(250) { index ->
+                val angle = -Math.PI + .15 + (index % 31) * (Math.PI - .3) / 30
+                Ball(24.0 + (index % 25) * 310.0 / 24, 105.0 + (index / 25) * 12, 430 * cos(angle), 430 * sin(angle))
+            },
+        )
+        var referenceHits: Long? = null
+        for (speed in listOf(1.0, 3.5, 6.0)) {
+            val engine = requireNotNull(GameEngine.restore(initial))
+            val mixer = PopMixer(sample)
+            val chunks = ArrayList<ShortArray>()
+            val hitSchedule = ArrayList<Pair<Int, Int>>()
+            var displayFrame = 0
+            while (engine.phase == Phase.FIRING || engine.phase == Phase.ADVANCING) {
+                assertTrue("Volley did not finish at $speed", displayFrame < 60 * 40)
+                val before = engine.totalHits
+                engine.tick(speed / 60)
+                val hits = (engine.totalHits - before).toInt()
+                if (hits > 0) {
+                    mixer.add(hits)
+                    hitSchedule.add(displayFrame * (SAMPLE_RATE / 60) to hits)
+                }
+                chunks.add(ShortArray(SAMPLE_RATE / 60).also { mixer.render(it) })
+                displayFrame++
+            }
+            chunks.add(ShortArray(sample.size + ONSET_INTERVAL_FRAMES).also { mixer.render(it) })
+            assertFalse("No sound backlog after $speed volley", mixer.active)
+            assertTrue("Must exercise dense physics, not an empty board", engine.totalHits > 1000)
+            assertEquals(engine.totalHits, mixer.acceptedHits)
+            if (referenceHits == null) referenceHits = engine.totalHits
+            assertEquals(referenceHits, engine.totalHits)
+            assertTrue(mixer.emittedPops > 30)
+            assertTrue(mixer.emittedPops <= displayFrame * (SAMPLE_RATE / 60) / ONSET_INTERVAL_FRAMES + 2L)
+            val pcm = ShortArray(chunks.sumOf { it.size })
+            var offset = 0
+            for (chunk in chunks) {
+                chunk.copyInto(pcm, offset)
+                offset += chunk.size
+            }
+            val peak = pcm.maxOf { abs(it.toInt()) } / PCM_SCALE
+            assertTrue("Unclipped linear output at $speed", peak in .1.. .65)
+            val audit = File("../build/audio-audit")
+            assertTrue(audit.isDirectory || audit.mkdirs())
+            writeWave(File(audit, "volley-${speed}x.wav"), pcm)
+            val trace = buildJsonObject {
+                put("speed", speed)
+                put("sampleRate", SAMPLE_RATE)
+                put("frames", pcm.size)
+                put("hits", engine.totalHits)
+                put("emittedPops", mixer.emittedPops)
+                put("peak", peak)
+                put("rms", sqrt(energy(pcm) / pcm.size))
+                put("events", buildJsonArray {
+                    for ((frame, hits) in hitSchedule) add(buildJsonObject {
+                        put("frame", frame)
+                        put("hits", hits)
+                    })
+                })
+            }
+            File(audit, "volley-${speed}x.json").writeText(trace.toString())
+            println("Dense audio: speed=$speed hits=${engine.totalHits} pops=${mixer.emittedPops} peak=$peak")
+        }
+    }
+
+    private fun writeWave(file: File, pcm: ShortArray) {
+        val bytes = ByteBuffer.allocate(44 + pcm.size * 2).order(ByteOrder.LITTLE_ENDIAN)
+        bytes.put("RIFF".toByteArray(Charsets.US_ASCII)).putInt(bytes.capacity() - 8)
+        bytes.put("WAVEfmt ".toByteArray(Charsets.US_ASCII)).putInt(16)
+        bytes.putShort(1).putShort(1).putInt(SAMPLE_RATE).putInt(SAMPLE_RATE * 2)
+        bytes.putShort(2).putShort(16).put("data".toByteArray(Charsets.US_ASCII)).putInt(pcm.size * 2)
+        for (value in pcm) bytes.putShort(value)
+        file.writeBytes(bytes.array())
     }
 
     private fun bundledPop(): ShortArray = PopSample.decode(File("src/main/res/raw/ui_pop.wav").readBytes())
@@ -273,7 +391,7 @@ class PopMixerTest {
         normalized * normalized
     }
 
-    private fun limitedPcm(value: Double): Short = (tanh(value) * 0.82 * 32767).toInt().toShort()
+    private fun linearPcm(value: Double): Short = (value * 32767).toInt().toShort()
 
     private fun renderChunks(mixer: PopMixer, frames: Int, chunks: IntArray): ShortArray {
         val result = ShortArray(frames)
@@ -294,6 +412,6 @@ class PopMixerTest {
     private companion object {
         const val SAMPLE_RATE = 44100
         const val PCM_SCALE = 32768.0
-        const val MAX_STAGGER_FRAMES = SAMPLE_RATE * 30 / 1000
+        const val ONSET_INTERVAL_FRAMES = SAMPLE_RATE * 60 / 1000
     }
 }

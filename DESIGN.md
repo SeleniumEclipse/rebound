@@ -28,7 +28,30 @@ No gradient, glow, glass blur, cream/serif fallback, highlighted headline word, 
 
 Use a short, soft UI pop—not a physical gum-bubble snap. The credited **UI_POP_UP.mp3 by Marevnik** was selected from an existing interface-sound listing with approximately 9,600 downloads, 247 ratings, and comments including “Exactly what I needed! Thanks.” These are observed page figures, not proof that every player will prefer it.
 
-The sample is decoded ahead of time into PCM, trimmed to about 71ms, and slightly attenuated. No substitute oscillator or musical beep is synthesized. A persistent AudioTrack mixes overlapping pops, and the game passes the actual number of hits rather than collapsing a frame to one event. Small same-frame groups get closely spaced onsets; extreme hit storms combine weighted onsets instead of building a long delayed queue. A soft limiter avoids hard clipping. Media volume and the player's Sound setting remain authoritative. Wall bounces are still silent; pops correspond to block hits.
+The sample is decoded ahead of time into PCM and trimmed to about 71ms. No substitute oscillator or musical beep is synthesized. The original sample, pitch, and attribution remain unchanged.
+
+The previous mixer stacked up to 96 voices, increased gain with collision count, and applied `tanh` to the sum. That prevented integer clipping but did not prevent harsh waveform distortion. At 6x, a real 250-ball collision trace produced an average signal level substantially higher than at 1x.
+
+Audio now groups dense collisions into fixed-level feedback, using the output sample clock rather than accelerated game time. The first hit starts immediately; further hits share one pending onset, at most 60ms later for the bundled sample. Complete sample tails overlap, with at most two voices and no hit-count gain multiplier or nonlinear limiter. This intentionally does not promise one separately audible pop per collision. Game hit counts remain exact. With the bundled sample, normal output gain is 0.5 and preview gain is 0.6; a one-time input peak bound guarantees headroom even for a full-scale test asset. Lifecycle stop clears pending feedback; a natural burst ends within one sample plus one onset interval. Media volume and Sound remain authoritative; wall bounces stay silent.
+
+## Difficulty Reference
+
+The first releases used estimated difficulty settings, not verified Ballz settings. Version 1.4.0 uses direct observation of [Richard's Corner's 2017 Ballz recording](https://www.youtube.com/watch?v=SziYPhcseTU). The [official description](https://apps.apple.com/us/app/ballz/id1139609950) confirms round-based progression but does not publish generation probabilities. Unofficial clones were not treated as Ketchapp's implementation.
+
+Counted 47 readable fresh rows from rounds 1-50, checking frames before their blocks were damaged. Excluded the edited/ambiguous transition around rounds 14-15 and the already-active round 19. [The observation table](design/ballz-observations.csv) records timestamps, counts, doubles, and ball pickups. Yellow currency rings are not extra balls.
+
+| Measurement | Observed Original | Rebound Before | Rebound 1.4.0 |
+| --- | --- | --- | --- |
+| Fresh blocks per row | 1-6; mean 3.234 | Uniform 2-4; mean 3 | 1-6; expected mean 3.249 |
+| Five- or six-block rows | 8/47 (17.0%) | Never | About 15.2% |
+| Fresh block strength | Round or double round | 70-130% of round, sometimes doubled | Round or double round |
+| Double-strength blocks | 24/152 (15.8%) | 12.5%, only from round 4 | One in six, including round 1 |
+| Opening ball supply | One ball, no pickup | One ball plus a pickup | One ball, no pickup |
+| Later ball supply | One collectible per observed row | One collectible per row | Unchanged |
+
+For each of six available block positions, a 54% trial determines row population, with a minimum of one block. All seven columns are shuffled, so the reserved extra-ball lane is not fixed. Expected incoming damage is about 3.79 times the round number, versus 3.375 previously: approximately 12% more on average, with crowded rows now possible. At least one column remains free of blocks, even when it contains a collectible.
+
+These probabilities are an approximation fitted to one short run, not recovered source code or statistically exact rates. Classic rules are the target, not unverified changes in newer Ballz releases. The observed footage supports one pickup per later row, not an exact published lifetime guarantee. The existing geometry, speed controls, launch spacing, and safety deadline remain Rebound's own behavior. Existing boards and earned balls are preserved; only newly generated rows use the revised rules.
 
 ## References
 

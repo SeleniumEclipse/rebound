@@ -39,7 +39,9 @@ class ReboundNavigationPersistenceTest : ReboundUiTest() {
         val game = snapshot()
         assertEquals(Phase.AIMING, game.phase)
         assertTrue(game.balls.isEmpty())
-        assertTrue(game.blocks.all { it.row == 0 && it.hits == 1 })
+        assertTrue(game.blocks.size in 1..6)
+        assertTrue(game.blocks.all { it.row == 0 && it.hits in 1..2 })
+        assertTrue(game.pickups.isEmpty())
         assertEquals(game, requireNotNull(GameStore(targetContext).load()).engine)
         assertEquals(1, requireNotNull(GameStore(targetContext).load()).best)
     }

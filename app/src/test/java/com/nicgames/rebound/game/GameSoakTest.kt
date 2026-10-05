@@ -48,7 +48,7 @@ class GameSoakTest {
             }
             completedTurns++
             val rowGroups = engine.blocks.groupBy { it.row }
-            assertTrue(rowGroups.values.all { it.size <= 4 })
+            assertTrue(rowGroups.values.all { it.size <= 6 })
             val cells = engine.blocks.map { it.row to it.column } + engine.pickups.map { it.row to it.column }
             assertEquals(cells.size, cells.toSet().size)
         }
